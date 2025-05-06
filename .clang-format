@@ -1,0 +1,28 @@
+---
+# Settings that apply to both C and C++
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 80
+UseTab: Never
+InsertNewlineAtEOF: true
+AllowShortEnumsOnASingleLine: false
+NamespaceIndentation: All
+IndentCaseLabels: true
+
+PointerAlignment: Right
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+AccessModifierOffset: -2
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+AllowShortFunctionsOnASingleLine: Empty
+AlwaysBreakTemplateDeclarations: Yes
+---
+Language: C
+# C-specific settings here if needed
+
+---
+Language: Cpp
+# C++-specific settings here if needed
