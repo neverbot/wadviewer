@@ -1,0 +1,3 @@
+[submodule "okinawa.cpp"]
+	path = okinawa.cpp
+	url = git@github.com:okinawa-dev/okinawa.cpp.git
