@@ -67,6 +67,15 @@ public:
     uint16_t flags;
   };
 
+  struct Level {
+    std::string          name;
+    std::vector<Vertex>  vertices;
+    std::vector<Linedef> linedefs;
+    std::vector<Sidedef> sidedefs;
+    std::vector<Sector>  sectors;
+    std::vector<Thing>   things;
+  };
+
   // Process and load all WAD data
   void processWAD();
 
@@ -82,19 +91,16 @@ private:
   Header                 header_;
   std::vector<Directory> directory_;
 
-  // Storage for WAD data
-  std::vector<Vertex>  vertices_;
-  std::vector<Linedef> linedefs_;
-  std::vector<Sidedef> sidedefs_;
-  std::vector<Sector>  sectors_;
-  std::vector<Thing>   things_;
+  // List of levels in the WAD file
+  std::vector<Level> levels_;
 
   // Method to read the WAD directory
   void readDirectory();
+  bool isLevelMarker(const std::string &name) const;
 
   // Method to find a lump by name
-  bool findLump(const std::string &name, uint32_t &offset,
-                uint32_t &size) const;
+  bool findLump(const std::string &name, uint32_t &offset, uint32_t &size,
+                size_t startIndex) const;
   // Method to read a lump from the WAD file
   std::vector<uint8_t> readLump(std::streamoff offset, std::size_t size);
 
