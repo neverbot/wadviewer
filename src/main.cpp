@@ -202,7 +202,8 @@ int main(int argc, char *argv[]) {
 
   camera->setPosition(position);
   camera->setDirection(front.normalize());
-  camera->setSpeed(cameraSpeed, cameraSpeed, cameraSpeed);  // Set speed in all directions
+  camera->setSpeed(cameraSpeed, cameraSpeed,
+                   cameraSpeed);                 // Set speed in all directions
   camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
 
   // Create main scene
