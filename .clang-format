@@ -6,6 +6,7 @@ ColumnLimit: 80
 UseTab: Never
 InsertNewlineAtEOF: true
 AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
 NamespaceIndentation: All
 IndentCaseLabels: true
 
@@ -17,7 +18,6 @@ AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
 AlignTrailingComments: true
 SpacesBeforeTrailingComments: 2
-AllowShortFunctionsOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: Yes
 ---
 Language: C

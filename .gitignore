@@ -56,3 +56,6 @@ wadviewer*
 # tests
 tests/
 coverage/
+
+# copilot
+.github/copilot*
