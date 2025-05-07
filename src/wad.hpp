@@ -85,6 +85,9 @@ public:
   // Convert WAD data to custom DSL format
   std::string toDSL() const;
 
+  Level       getLevel(std::string name) const;
+  std::string getLevelNameByIndex(size_t index) const;
+
 private:
   bool                   verbose_;
   std::string            filepath_;

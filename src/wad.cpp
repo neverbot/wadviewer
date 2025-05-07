@@ -533,3 +533,33 @@ std::string WAD::toJSON() const {
 
   return out.str();
 }
+
+/**
+ * @brief Get a level by name
+ * @param name Name of the level
+ * @return Level object
+ * @throws std::runtime_error if the level is not found
+ */
+WAD::Level WAD::getLevel(std::string name) const {
+  for (size_t i = 0; i < levels_.size(); i++) {
+    if (levels_[i].name == name) {
+      return levels_[i];
+    }
+  }
+
+  throw std::runtime_error("Level not found");
+}
+
+/**
+ * @brief Get the name of a level by index
+ * @param index Index of the level
+ * @return Name of the level
+ * @throws std::out_of_range if the index is out of range
+ */
+std::string WAD::getLevelNameByIndex(size_t index) const {
+  if (index < levels_.size()) {
+    return levels_[index].name;
+  } else {
+    throw std::out_of_range("Index out of range");
+  }
+}
