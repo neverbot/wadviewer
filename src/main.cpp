@@ -8,7 +8,9 @@
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include <cmath>
 #include <iostream>
+#include <map>
 
+#include "./wad-renderer.hpp"
 #include "./wad.hpp"
 
 // enum with the possible formats for the file to view
@@ -74,223 +76,6 @@ void drawCallback(float deltaTime) {
   // Do whatever is needed, probably nothing here
 }
 
-const float SCALE = 1.0f;  // Adjust to scale the level
-float       centerX;
-float       centerY;
-
-/**
- * @brief Creates a vertical wall face between two sectors with different
- * heights.
- * @param vertex1 The first vertex index.
- * @param vertex2 The second vertex index.
- * @param sector1 The sector on one side of the wall.
- * @param sector2 The sector on the other side of the wall.
- * @param vertices Vector to store vertex data.
- * @param indices Vector to store index data.
- */
-void createWallFace(const WAD::Vertex &v1, const WAD::Vertex &v2,
-                    const WAD::Sector &sector1, const WAD::Sector &sector2,
-                    std::vector<float>        &vertices,
-                    std::vector<unsigned int> &indices) {
-  // Calculate normalized positions
-  float x1 = (static_cast<float>(v1.x) - centerX) * SCALE;
-  float z1 = (static_cast<float>(v1.y) - centerY) * SCALE;
-  float x2 = (static_cast<float>(v2.x) - centerX) * SCALE;
-  float z2 = (static_cast<float>(v2.y) - centerY) * SCALE;
-
-  // Get ceiling and floor heights
-  float floor1 = static_cast<float>(sector1.floor_height);
-  float ceil1  = static_cast<float>(sector1.ceiling_height);
-  float floor2 = static_cast<float>(sector2.floor_height);
-  float ceil2  = static_cast<float>(sector2.ceiling_height);
-
-  // Calculate vertex indices
-  unsigned int baseIndex = vertices.size() / 5;  // 5 floats per vertex
-
-  // Add vertices for the wall quad
-  // Bottom left
-  vertices.push_back(x1);
-  vertices.push_back(floor1);
-  vertices.push_back(-z1);
-  vertices.push_back(0.0f);
-  vertices.push_back(0.0f);
-
-  // Top left
-  vertices.push_back(x1);
-  vertices.push_back(ceil1);
-  vertices.push_back(-z1);
-  vertices.push_back(0.0f);
-  vertices.push_back(1.0f);
-
-  // Bottom right
-  vertices.push_back(x2);
-  vertices.push_back(floor2);
-  vertices.push_back(-z2);
-  vertices.push_back(1.0f);
-  vertices.push_back(0.0f);
-
-  // Top right
-  vertices.push_back(x2);
-  vertices.push_back(ceil2);
-  vertices.push_back(-z2);
-  vertices.push_back(1.0f);
-  vertices.push_back(1.0f);
-
-  // Add indices for two triangles (CCW winding)
-  indices.push_back(baseIndex);      // Bottom left
-  indices.push_back(baseIndex + 1);  // Top left
-  indices.push_back(baseIndex + 2);  // Bottom right
-
-  indices.push_back(baseIndex + 1);  // Top left
-  indices.push_back(baseIndex + 3);  // Top right
-  indices.push_back(baseIndex + 2);  // Bottom right
-}
-
-/**
- * @brief Convert a WAD level to an OkItem.
- * @param level The WAD level to convert.
- * @return A pointer to the created OkItem.
- */
-OkItem *WADToOkItem(const WAD::Level &level) {
-  // Calculate level bounds
-  float minX = std::numeric_limits<float>::max();
-  float maxX = std::numeric_limits<float>::lowest();
-  float minY = std::numeric_limits<float>::max();
-  float maxY = std::numeric_limits<float>::lowest();
-
-  for (const auto &vertex : level.vertices) {
-    minX = std::min(minX, static_cast<float>(vertex.x));
-    maxX = std::max(maxX, static_cast<float>(vertex.x));
-    minY = std::min(minY, static_cast<float>(vertex.y));
-    maxY = std::max(maxY, static_cast<float>(vertex.y));
-  }
-
-  // Calculate center point and dimensions
-  centerX = (minX + maxX) / 2.0f;
-  centerY = (minY + maxY) / 2.0f;
-
-  // Optional: Calculate scale to normalize size
-  float width        = maxX - minX;
-  float height       = maxY - minY;
-  float maxDimension = std::max(width, height);
-
-  // Convert WAD vertices to OpenGL format, centered around origin
-  std::vector<float>        levelVertices;
-  std::vector<unsigned int> levelIndices;
-
-  // First, create a map to store vertex-to-sector relationships
-  std::vector<const WAD::Sector *> vertexSectors(level.vertices.size(),
-                                                 nullptr);
-
-  // Find which sector each vertex belongs to through linedefs
-  for (size_t i = 0; i < level.linedefs.size(); i++) {
-    const WAD::Linedef &linedef = level.linedefs[i];
-
-    if (linedef.right_sidedef != 0xFFFF) {
-      const WAD::Sidedef &sidedef = level.sidedefs[linedef.right_sidedef];
-      if (sidedef.sector < level.sectors.size()) {
-        const WAD::Sector *sector           = &level.sectors[sidedef.sector];
-        vertexSectors[linedef.start_vertex] = sector;
-        vertexSectors[linedef.end_vertex]   = sector;
-      }
-    }
-  }
-
-  // Now create vertices with their proper sector heights
-  for (size_t i = 0; i < level.vertices.size(); i++) {
-    const WAD::Vertex &vertex = level.vertices[i];
-    const WAD::Sector *sector = vertexSectors[i];
-
-    // Skip vertices that don't belong to any sector
-    if (!sector) {
-      continue;
-    }
-
-    // Subtract center to normalize around origin
-    float normalizedX = (static_cast<float>(vertex.x) - centerX) * SCALE;
-    float normalizedY = (static_cast<float>(vertex.y) - centerY) * SCALE;
-
-    // Add floor vertex
-    levelVertices.push_back(normalizedX);  // x
-    levelVertices.push_back(
-        static_cast<float>(sector->floor_height));  // y (flat map)
-    levelVertices.push_back(-normalizedY);  // z (negated for -Z forward)
-    levelVertices.push_back(0.0f);          // u texture coord
-    levelVertices.push_back(0.0f);          // v texture coord
-
-    // Add ceiling vertex
-    levelVertices.push_back(normalizedX);
-    levelVertices.push_back(static_cast<float>(sector->ceiling_height));
-    levelVertices.push_back(-normalizedY);
-    levelVertices.push_back(0.0f);
-    levelVertices.push_back(1.0f);
-  }
-
-  // Second pass: Create triangles from linedefs
-  for (size_t i = 0; i < level.linedefs.size(); i++) {
-    const WAD::Linedef &linedef = level.linedefs[i];
-
-    // Only process linedefs that have a right (front) sidedef
-    if (linedef.right_sidedef != 0xFFFF) {
-      const WAD::Sidedef &leftSide  = level.sidedefs[linedef.left_sidedef];
-      const WAD::Sidedef &rightSide = level.sidedefs[linedef.right_sidedef];
-
-      const WAD::Sector &sector1 = level.sectors[leftSide.sector];
-      const WAD::Sector &sector2 = level.sectors[rightSide.sector];
-
-      // Create wall if sectors have different heights
-      if (sector1.floor_height != sector2.floor_height ||
-          sector1.ceiling_height != sector2.ceiling_height) {
-        const WAD::Vertex &v1 = level.vertices[linedef.start_vertex];
-        const WAD::Vertex &v2 = level.vertices[linedef.end_vertex];
-        // Create wall geometry
-        createWallFace(v1, v2, sector1, sector2, levelVertices, levelIndices);
-      }
-      // Get the sector this sidedef belongs to
-      if (rightSide.sector < level.sectors.size()) {
-        const WAD::Sector &sector = level.sectors[rightSide.sector];
-
-        // Create two triangles for each linedef segment
-        unsigned int v1 = linedef.start_vertex;
-        unsigned int v2 = linedef.end_vertex;
-
-        // Find next linedef that shares v2 as start vertex
-        for (size_t j = 0; j < level.linedefs.size(); j++) {
-          if (level.linedefs[j].start_vertex == v2) {
-            unsigned int v3 = level.linedefs[j].end_vertex;
-
-            // Add triangle indices (CCW winding)
-            levelIndices.push_back(v1);
-            levelIndices.push_back(v2);
-            levelIndices.push_back(v3);
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  OkLogger::info("Created geometry with " +
-                 std::to_string(levelVertices.size() / 5) + " vertices and " +
-                 std::to_string(levelIndices.size() / 3) + " triangles");
-
-  // Create the item with the geometry
-  OkItem *levelItem =
-      new OkItem("level_geometry", levelVertices.data(), levelVertices.size(),
-                 levelIndices.data(), levelIndices.size());
-
-  // Log the normalization info
-  OkLogger::info("Level bounds: (" + std::to_string(minX) + "," +
-                 std::to_string(minY) + ") to (" + std::to_string(maxX) + "," +
-                 std::to_string(maxY) + ")");
-  OkLogger::info("Level center: (" + std::to_string(centerX) + "," +
-                 std::to_string(centerY) + ")");
-  OkLogger::info("Level dimensions: " + std::to_string(width) + " x " +
-                 std::to_string(height));
-
-  return levelItem;
-}
-
 /**
  * @brief Position the camera to view an item.
  * @param camera The camera to position.
@@ -298,7 +83,7 @@ OkItem *WADToOkItem(const WAD::Level &level) {
  */
 void positionCameraForItem(OkCamera *camera, const OkItem *item) {
   float radius   = item->getRadius();
-  float distance = radius;  // * 2.0f;
+  float distance = radius * 2.0f;
   float height   = distance * 0.5f;
 
   // Position camera above and behind the origin (item center)
@@ -319,8 +104,10 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
 
   camera->setPerspective(fov, nearPlane, farPlane);
 
-  OkLogger::info("Camera positioned at height: " + std::to_string(height) +
-                 ", distance: " + std::to_string(distance));
+  OkLogger::info("Camera positioned at: " + cameraPos.toString());
+  OkLogger::info(
+      "Camera looking at pitch: " + std::to_string(glm::degrees(pitch)) +
+      " yaw: " + std::to_string(glm::degrees(yaw)));
 }
 
 /**
@@ -415,7 +202,7 @@ int main(int argc, char *argv[]) {
   OkItem *levelItem = nullptr;
 
   try {
-    WAD wad(contentFile, true);  // Verbose mode
+    WAD wad(contentFile);  // Verbose mode
     wad.processWAD();
 
     // If no level name was provided, use the first level
@@ -427,13 +214,27 @@ int main(int argc, char *argv[]) {
     WAD::Level level = wad.getLevel(levelName);
     OkLogger::info("Level name: " + level.name);
 
-    // Create level geometry
-    levelItem = WADToOkItem(level);
-    levelItem->setWireframe(true);
+    // Create level geometry using the renderer
+    WADRenderer renderer;
+    levelItem = renderer.createLevelGeometry(level);
+    levelItem->setWireframe(false);
     scene->addItem(levelItem);
 
     // Position camera to view the level
     positionCameraForItem(camera, levelItem);
+
+    // Add coordinate axes for reference
+    float              axisLength = 100.0f;
+    std::vector<float> axisVerts  = {
+        0, 0, 0, axisLength, 0,          0,           // X axis
+        0, 0, 0, 0,          axisLength, 0,           // Y axis
+        0, 0, 0, 0,          0,          -axisLength  // Z axis (-Z is forward)
+    };
+    std::vector<unsigned int> axisIndices = {0, 1, 2, 3, 4, 5};
+    OkItem *axes = new OkItem("axes", axisVerts.data(), axisVerts.size(),
+                              axisIndices.data(), axisIndices.size());
+    axes->setDrawMode(GL_LINES);
+    scene->addItem(axes);
 
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
