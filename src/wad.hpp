@@ -67,13 +67,58 @@ public:
     uint16_t flags;
   };
 
+  struct PatchHeader {
+    int16_t  width;             // Width of patch
+    int16_t  height;            // Height of patch
+    int16_t  left_offset;       // Left offset
+    int16_t  top_offset;        // Top offset
+    uint32_t column_offsets[];  // Offset table, size = width
+  };
+
+  struct PatchColumn {
+    uint8_t top_delta;  // 0xFF is the end of column marker
+    uint8_t length;     // Length of the column data
+    uint8_t padding;    // Unused byte
+    uint8_t data[];     // Pixel data
+  };
+
+  struct PatchData {
+    std::string          name;    // Name from PNAMES
+    uint16_t             width;   // Width of the patch
+    uint16_t             height;  // Height of the patch
+    std::vector<uint8_t> pixels;  // Pixel data (width * height)
+  };
+
+  // Patch definition in a texture
+  struct PatchInTexture {
+    int16_t  origin_x;   // X offset from top-left of texture
+    int16_t  origin_y;   // Y offset from top-left of texture
+    uint16_t patch_num;  // Index into PNAMES
+    uint16_t stepdir;    // Unused
+    uint16_t colormap;   // Unused
+  };
+
+  // Texture definition
+  struct TextureDef {
+    char                        name[8];      // Texture name
+    uint32_t                    masked;       // Composite texture
+    uint16_t                    width;        // Width of texture
+    uint16_t                    height;       // Height of texture
+    uint32_t                    column_dir;   // Unused
+    uint16_t                    patch_count;  // Number of patches
+    std::vector<PatchInTexture> patches;
+  };
+
   struct Level {
-    std::string          name;
-    std::vector<Vertex>  vertices;
-    std::vector<Linedef> linedefs;
-    std::vector<Sidedef> sidedefs;
-    std::vector<Sector>  sectors;
-    std::vector<Thing>   things;
+    std::string              name;
+    std::vector<Vertex>      vertices;
+    std::vector<Linedef>     linedefs;
+    std::vector<Sidedef>     sidedefs;
+    std::vector<Sector>      sectors;
+    std::vector<Thing>       things;
+    std::vector<PatchData>   patches;
+    std::vector<std::string> patch_names;   // PNAMES
+    std::vector<TextureDef>  texture_defs;  // TEXTURE1/TEXTURE2
   };
 
   // Process and load all WAD data
@@ -115,4 +160,10 @@ private:
   std::vector<Sidedef> readSidedefs(std::streamoff offset, std::size_t size);
   std::vector<Sector>  readSectors(std::streamoff offset, std::size_t size);
   std::vector<Thing>   readThings(std::streamoff offset, std::size_t size);
+  std::vector<std::string> readPatchNames(std::streamoff offset,
+                                          std::size_t    size);
+  std::vector<TextureDef>  readTextureDefs(std::streamoff offset,
+                                           std::size_t    size);
+  PatchData                readPatch(std::streamoff offset, std::size_t size,
+                                     const std::string &name);
 };

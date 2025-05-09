@@ -195,6 +195,138 @@ std::vector<WAD::Thing> WAD::readThings(std::streamoff offset,
 }
 
 /**
+ * @brief Read a patch lump and convert it to RGBA format
+ * @param offset Offset of the patch in the file
+ * @param size Size of the patch
+ * @param name Name of the patch
+ * @return PatchData containing the converted patch
+ */
+WAD::PatchData WAD::readPatch(std::streamoff offset, std::size_t size,
+                              const std::string &name) {
+  auto      data = readLump(offset, size);
+  PatchData patch;
+  patch.name = name;
+
+  // Read patch header
+  const PatchHeader *header =
+      reinterpret_cast<const PatchHeader *>(data.data());
+  patch.width  = header->width;
+  patch.height = header->height;
+
+  // Initialize pixel data (RGBA format)
+  patch.pixels.resize(patch.width * patch.height * 4, 0);
+
+  // Read column offsets
+  const uint32_t *columnOffsets = &header->column_offsets[0];
+
+  // Process each column
+  for (int x = 0; x < patch.width; x++) {
+    uint32_t       columnOffset = columnOffsets[x];
+    const uint8_t *column       = data.data() + columnOffset;
+
+    while (true) {
+      uint8_t topdelta = *column++;
+      if (topdelta == 0xFF)  // End of column
+        break;
+
+      uint8_t length = *column++;
+      column++;  // Skip padding byte
+
+      // Copy pixels to RGBA format
+      for (int y = 0; y < length; y++) {
+        uint8_t pixel     = *column++;
+        int     destIndex = ((topdelta + y) * patch.width + x) * 4;
+
+        // Convert palette index to RGBA (placeholder values for now)
+        patch.pixels[destIndex + 0] = pixel;  // R
+        patch.pixels[destIndex + 1] = pixel;  // G
+        patch.pixels[destIndex + 2] = pixel;  // B
+        patch.pixels[destIndex + 3] = 255;    // A
+      }
+
+      column++;  // Skip padding byte
+    }
+  }
+
+  return patch;
+}
+
+/**
+ * @brief Read patch names from the WAD file
+ * @param offset Offset of the patch names in the file
+ * @param size Size of the patch names
+ * @return Vector containing the patch names
+ */
+std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
+                                             std::size_t    size) {
+  auto                     data = readLump(offset, size);
+  std::vector<std::string> names;
+
+  // First 4 bytes is number of patches
+  uint32_t num_patches;
+  std::memcpy(&num_patches, data.data(), sizeof(uint32_t));
+
+  // Read patch names (8 bytes each, zero-terminated)
+  const char *name_data = reinterpret_cast<const char *>(data.data() + 4);
+  for (uint32_t i = 0; i < num_patches; i++) {
+    names.push_back(
+        std::string(name_data + i * 8, strnlen(name_data + i * 8, 8)));
+  }
+
+  return names;
+}
+
+/**
+ * @brief Read texture definitions from the WAD file
+ * @param offset Offset of the texture definitions in the file
+ * @param size Size of the texture definitions
+ * @return Vector containing the texture definitions
+ */
+std::vector<WAD::TextureDef> WAD::readTextureDefs(std::streamoff offset,
+                                                  std::size_t    size) {
+  auto                    data = readLump(offset, size);
+  std::vector<TextureDef> textures;
+
+  // First 4 bytes is number of textures
+  uint32_t num_textures;
+  std::memcpy(&num_textures, data.data(), sizeof(uint32_t));
+
+  // Get offsets to each texture
+  std::vector<uint32_t> offsets(num_textures);
+  std::memcpy(offsets.data(), data.data() + 4, num_textures * sizeof(uint32_t));
+
+  // Read each texture definition
+  for (uint32_t i = 0; i < num_textures; i++) {
+    TextureDef     tex;
+    const uint8_t *tex_data = data.data() + offsets[i];
+
+    // Read texture header
+    std::memcpy(tex.name, tex_data, 8);
+    std::memcpy(&tex.masked, tex_data + 8, 4);
+    std::memcpy(&tex.width, tex_data + 12, 2);
+    std::memcpy(&tex.height, tex_data + 14, 2);
+    std::memcpy(&tex.column_dir, tex_data + 16, 4);
+    std::memcpy(&tex.patch_count, tex_data + 20, 2);
+
+    // Read patches
+    const uint8_t *patch_data = tex_data + 22;
+    for (uint16_t j = 0; j < tex.patch_count; j++) {
+      PatchInTexture patch;
+      std::memcpy(&patch.origin_x, patch_data + j * 10, 2);
+      std::memcpy(&patch.origin_y, patch_data + j * 10 + 2, 2);
+      std::memcpy(&patch.patch_num, patch_data + j * 10 + 4, 2);
+      std::memcpy(&patch.stepdir, patch_data + j * 10 + 6, 2);
+      std::memcpy(&patch.colormap, patch_data + j * 10 + 8, 2);
+      tex.patches.push_back(patch);
+    }
+
+    textures.push_back(tex);
+  }
+
+  return textures;
+}
+
+/**
  * @brief Process the WAD file and load all data
  * @throws std::runtime_error if any of the lumps cannot be read
  * @note This function reads all the lumps in the WAD file and stores them in
@@ -253,6 +385,62 @@ void WAD::processWAD() {
         if (verbose_) {
           std::cout << "Level " << lumpName << ": Loaded "
                     << level.things.size() << " things\n";
+        }
+      }
+
+      // Read PNAMES
+      if (findLump("PNAMES", offset, size)) {
+        std::vector<std::string> patch_names = readPatchNames(offset, size);
+        if (verbose_) {
+          std::cout << "Loaded " << patch_names.size() << " patch names\n";
+        }
+        // Store in each level for now (could optimize later)
+        for (Level &level : levels_) {
+          level.patch_names = patch_names;
+        }
+      }
+
+      if (findLump("PNAMES", offset, size)) {
+        std::vector<std::string> patch_names = readPatchNames(offset, size);
+
+        // Load each patch
+        for (const std::string &name : patch_names) {
+          if (findLump(name, offset, size)) {
+            PatchData patch = readPatch(offset, size, name);
+            if (verbose_) {
+              std::cout << "Loaded patch " << name << " (" << patch.width << "x"
+                        << patch.height << ")\n";
+            }
+            // Store patch in current level
+            level.patches.push_back(patch);
+          }
+        }
+      }
+
+      // Read TEXTURE1
+      if (findLump("TEXTURE1", offset, size)) {
+        std::vector<TextureDef> textures = readTextureDefs(offset, size);
+        if (verbose_) {
+          std::cout << "Loaded " << textures.size()
+                    << " textures from TEXTURE1\n";
+        }
+        // Store in each level
+        for (Level &level : levels_) {
+          level.texture_defs = textures;
+        }
+      }
+
+      // Optionally read TEXTURE2 and append to texture list
+      if (findLump("TEXTURE2", offset, size)) {
+        std::vector<TextureDef> textures2 = readTextureDefs(offset, size);
+        if (verbose_) {
+          std::cout << "Loaded " << textures2.size()
+                    << " textures from TEXTURE2\n";
+        }
+        // Append to existing textures
+        for (Level &level : levels_) {
+          level.texture_defs.insert(level.texture_defs.end(), textures2.begin(),
+                                    textures2.end());
         }
       }
 
