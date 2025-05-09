@@ -33,24 +33,20 @@ void stepCallback(float deltaTime) {
 
   float velocity = camera->getSpeedMagnitude() * timeInSeconds;
 
-  OkPoint       position = camera->getPosition();
-  OkPoint       front    = camera->getFront();
-  const OkPoint up(0.0f, 1.0f, 0.0f);
+  OkPoint position = camera->getPosition();
+  OkPoint forward  = camera->getRotation().getForwardVector();
+  OkPoint right    = camera->getRotation().getRightVector();
+  OkPoint up       = camera->getRotation().getUpVector();
 
-  // Forward/Backward
+  // Forward/Backward movement along forward vector
   if (state.forward) {
-    position = position + (front * velocity);
+    position = position + (forward * velocity);
   }
   if (state.backward) {
-    position = position - (front * velocity);
+    position = position - (forward * velocity);
   }
 
-  // Left/Right - Calculate strafe vector using cross product
-  glm::vec3 frontVec = front.toVec3();
-  glm::vec3 upVec    = up.toVec3();
-  glm::vec3 rightVec = glm::normalize(glm::cross(frontVec, upVec));
-  OkPoint   right(rightVec.x, rightVec.y, rightVec.z);
-
+  // Left/Right movement along right vector
   if (state.strafeLeft) {
     position = position - (right * velocity);
   }
@@ -58,7 +54,7 @@ void stepCallback(float deltaTime) {
     position = position + (right * velocity);
   }
 
-  // Update camera position using new OkPoint method
+  // Update camera position
   camera->setPosition(position);
 
   // Debug logging
@@ -114,11 +110,11 @@ OkItem *WADToOkItem(const WAD::Level &level) {
     float normalizedX = (static_cast<float>(vertex.x) - centerX) * SCALE;
     float normalizedY = (static_cast<float>(vertex.y) - centerY) * SCALE;
 
-    levelVertices.push_back(normalizedX);  // x
-    levelVertices.push_back(0.0f);         // y (flat map)
-    levelVertices.push_back(normalizedY);  // z
-    levelVertices.push_back(0.0f);         // u texture coord
-    levelVertices.push_back(0.0f);         // v texture coord
+    levelVertices.push_back(normalizedX);   // x
+    levelVertices.push_back(0.0f);          // y (flat map)
+    levelVertices.push_back(-normalizedY);  // z
+    levelVertices.push_back(0.0f);          // u texture coord
+    levelVertices.push_back(0.0f);          // v texture coord
   }
 
   // Rest of the function remains the same
@@ -164,13 +160,14 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
 
   // Position camera above and behind the origin (item center)
   OkPoint cameraPos(0.0f, height, distance);
-  OkPoint targetPos(0.0f, 0.0f, 0.0f);  // Looking at origin
-
   camera->setPosition(cameraPos);
 
-  // Calculate direction vector using OkPoint and use new setDirection overload
+  OkPoint targetPos(0.0f, 0.0f, 0.0f);  // Looking at origin
   OkPoint direction = targetPos - cameraPos;
-  camera->setDirection(direction.normalize());
+
+  float pitch, yaw;
+  OkMath::directionVectorToAngles(direction.normalize(), pitch, yaw);
+  camera->setRotation(pitch, yaw, 0.0f);
 
   // Adjust perspective for item size
   float fov       = 90.0f;
@@ -196,12 +193,14 @@ int main(int argc, char *argv[]) {
   const float cameraSpeed = 200.0f;  // Increased from 40.0f to 200.0f
 
   // Set initial camera
-  OkCamera *camera = OkCore::getCamera();
-  OkPoint   position(0.0f, 100.0f, 200.0f);  // Lower height, moved back
-  OkPoint   front(0.0f, -0.5f, -1.0f);       // Looking down at an angle
+  OkCamera  *camera = OkCore::getCamera();
+  OkPoint    position(0.0f, 100.0f, 200.0f);  // Lower height, moved back
+  float      pitch = glm::radians(-30.0f);    // Looking down 30 degrees
+  float      yaw   = 0.0f;                    // Looking towards -Z
+  OkRotation rotation(pitch, yaw, 0.0f);
 
   camera->setPosition(position);
-  camera->setDirection(front.normalize());
+  camera->setRotation(rotation);
   camera->setSpeed(cameraSpeed, cameraSpeed,
                    cameraSpeed);                 // Set speed in all directions
   camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
