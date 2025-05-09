@@ -155,7 +155,7 @@ OkItem *WADToOkItem(const WAD::Level &level) {
  */
 void positionCameraForItem(OkCamera *camera, const OkItem *item) {
   float radius   = item->getRadius();
-  float distance = radius * 0.5f;
+  float distance = radius;  // * 2.0f;
   float height   = distance * 0.5f;
 
   // Position camera above and behind the origin (item center)
@@ -170,7 +170,7 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
   camera->setRotation(pitch, yaw, 0.0f);
 
   // Adjust perspective for item size
-  float fov       = 90.0f;
+  float fov       = 45.0f;
   float nearPlane = 0.1f;
   float farPlane  = item->getRadius() * 5.0f;
 
@@ -199,11 +199,12 @@ int main(int argc, char *argv[]) {
   float      yaw   = 0.0f;                    // Looking towards -Z
   OkRotation rotation(pitch, yaw, 0.0f);
 
-  camera->setPosition(position);
-  camera->setRotation(rotation);
   camera->setSpeed(cameraSpeed, cameraSpeed,
-                   cameraSpeed);                 // Set speed in all directions
-  camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
+                   cameraSpeed);  // Set speed in all directions
+  // Not needed, will be set in positionCameraForItem
+  // camera->setPosition(position);
+  // camera->setRotation(rotation);
+  // camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
 
   // Create main scene
   OkScene *scene = new OkScene("MainScene");
