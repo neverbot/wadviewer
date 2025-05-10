@@ -482,18 +482,22 @@ void WADConverter::createTextureFromDef(
     return;
   }
 
-  // Create empty texture of required size
-  std::vector<unsigned char> textureData(texDef.width * texDef.height * 4, 0);
+  // Create empty texture of required size with default color (to handle missing
+  // patches)
+  std::vector<unsigned char> textureData(texDef.width * texDef.height * 4, 128);
+
+  // Count valid patches
+  size_t validPatchCount = 0;
 
   // For each patch in the texture
   for (size_t i = 0; i < texDef.patches.size(); i++) {
     const WAD::PatchInTexture &patchInfo = texDef.patches[i];
 
-    // Validate patch index
+    // Skip invalid patch indices instead of failing
     if (patchInfo.patch_num >= patches.size()) {
-      OkLogger::error("Invalid patch index " +
-                      std::to_string(patchInfo.patch_num) + " for texture " +
-                      texName);
+      OkLogger::warning("Skipping invalid patch index " +
+                        std::to_string(patchInfo.patch_num) + " in texture " +
+                        texName);
       continue;
     }
 
@@ -503,7 +507,7 @@ void WADConverter::createTextureFromDef(
     // Skip invalid patches
     if (patchData.pixels.empty() || patchData.width <= 0 ||
         patchData.height <= 0) {
-      OkLogger::error("Invalid patch data in texture " + texName);
+      OkLogger::warning("Skipping invalid patch data in texture " + texName);
       continue;
     }
 
@@ -511,6 +515,7 @@ void WADConverter::createTextureFromDef(
       // Composite patch onto texture at (origin_x, origin_y)
       compositePatch(textureData, texDef.width, texDef.height, patchData,
                      patchInfo.origin_x, patchInfo.origin_y, palette);
+      validPatchCount++;
     } catch (const std::exception &e) {
       OkLogger::error("Error compositing patch in texture " + texName + ": " +
                       e.what());
@@ -518,12 +523,19 @@ void WADConverter::createTextureFromDef(
     }
   }
 
-  OkLogger::info("WADConverter :: Creating texture '" + texName +
-                 "' - Size: " + std::to_string(texDef.width) + "x" +
-                 std::to_string(texDef.height) +
-                 ", Patches: " + std::to_string(texDef.patches.size()));
+  // Only create texture if we have at least one valid patch
+  if (validPatchCount > 0) {
+    OkLogger::info("WADConverter :: Creating texture '" + texName + "' (" +
+                   std::to_string(texDef.width) + "x" +
+                   std::to_string(texDef.height) +
+                   "), Valid patches: " + std::to_string(validPatchCount) +
+                   "/" + std::to_string(texDef.patches.size()));
 
-  // Create texture using the dedicated creation method
-  OkTextureHandler::getInstance()->createTextureFromRawData(
-      texName, textureData.data(), texDef.width, texDef.height, 4);
+    // Create texture using the dedicated creation method
+    OkTextureHandler::getInstance()->createTextureFromRawData(
+        texName, textureData.data(), texDef.width, texDef.height, 4);
+  } else {
+    OkLogger::error("No valid patches found for texture " + texName +
+                    " - texture will not be created");
+  }
 }
