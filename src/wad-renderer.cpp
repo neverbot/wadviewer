@@ -8,16 +8,11 @@ float       WADRenderer::centerY = 0.0f;
 const float WADRenderer::SCALE   = 1.0f;
 
 WADRenderer::WADRenderer() {
-  // Constructor
+  // Empty constructor
 }
 
 WADRenderer::~WADRenderer() {
-  // Clean up textures
-  for (std::map<std::string, OkTexture *>::iterator it = textureCache.begin();
-       it != textureCache.end(); ++it) {
-    delete it->second;
-  }
-  textureCache.clear();
+  // Nothing to clean up - TextureHandler handles texture cleanup
 }
 
 /**
@@ -49,23 +44,28 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
   float height       = maxY - minY;
   float maxDimension = std::max(width, height);
 
-  // Debug texture definitions
-  OkLogger::info("WAD texture info:");
-  OkLogger::info("- Texture definitions: " +
-                 std::to_string(level.texture_defs.size()));
-  OkLogger::info("- Patches available: " +
-                 std::to_string(level.patches.size()));
-  OkLogger::info("- Palette colors: " + std::to_string(level.palette.size()));
+  // Log texture and level info in single lines
+  OkLogger::info("WADRenderer :: Level info - Textures: " +
+                 std::to_string(level.texture_defs.size()) +
+                 ", Patches: " + std::to_string(level.patches.size()) +
+                 ", Colors: " + std::to_string(level.palette.size()));
 
   if (level.texture_defs.empty()) {
     OkLogger::error("No texture definitions found in level!");
-    // Print first few sidedefs textures for debugging
     for (size_t i = 0; i < 5 && i < level.sidedefs.size(); i++) {
       const WAD::Sidedef &sidedef = level.sidedefs[i];
-      OkLogger::info("Sidedef " + std::to_string(i) + " textures:");
-      OkLogger::info("- Upper: " + std::string(sidedef.upper_texture, 8));
-      OkLogger::info("- Middle: " + std::string(sidedef.middle_texture, 8));
-      OkLogger::info("- Lower: " + std::string(sidedef.lower_texture, 8));
+      std::string         upper(sidedef.upper_texture, 8);
+      std::string         middle(sidedef.middle_texture, 8);
+      std::string         lower(sidedef.lower_texture, 8);
+      while (!upper.empty() && upper.back() == ' ')
+        upper.pop_back();
+      while (!middle.empty() && middle.back() == ' ')
+        middle.pop_back();
+      while (!lower.empty() && lower.back() == ' ')
+        lower.pop_back();
+      OkLogger::info("WADRenderer :: Sidedef " + std::to_string(i) +
+                     " textures - Upper: '" + upper + "', Middle: '" + middle +
+                     "', Lower: '" + lower + "'");
     }
   }
 
@@ -84,11 +84,6 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
     while (!lowerTex.empty() && lowerTex.back() == ' ')
       lowerTex.pop_back();
 
-    // OkLogger::info("WADRenderer :: Processing textures - Upper: '" + upperTex
-    // +
-    //                "' Middle: '" + middleTex + "' Lower: '" + lowerTex +
-    //                "'");
-
     // Find corresponding texture definitions
     for (const WAD::TextureDef &texDef : level.texture_defs) {
       std::string texName(texDef.name, 8);
@@ -97,11 +92,7 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
 
       if (!texName.empty() && (texName == upperTex || texName == middleTex ||
                                texName == lowerTex)) {
-        // Create texture if not already in cache
-        if (textureCache.find(texName) == textureCache.end()) {
-          OkLogger::info("Found matching texture: '" + texName + "'");
-          createTextureFromDef(texDef, level.patches, level.palette);
-        }
+        createTextureFromDef(texDef, level.patches, level.palette);
       }
     }
   }
@@ -115,13 +106,10 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
   std::map<std::string, GeometryGroup> geometryGroups;
 
   // Log level stats before processing
-  OkLogger::info("WADRenderer :: Creating geometry for level: " + level.name);
-  OkLogger::info("WADRenderer :: Vertices: " +
-                 std::to_string(level.vertices.size()));
-  OkLogger::info("WADRenderer :: Linedefs: " +
-                 std::to_string(level.linedefs.size()));
-  OkLogger::info("WADRenderer :: Sectors: " +
-                 std::to_string(level.sectors.size()));
+  OkLogger::info("WADRenderer :: Level '" + level.name +
+                 "' - Vertices: " + std::to_string(level.vertices.size()) +
+                 ", Linedefs: " + std::to_string(level.linedefs.size()) +
+                 ", Sectors: " + std::to_string(level.sectors.size()));
 
   // First, create a map to store vertex-to-sector relationships
   std::vector<const WAD::Sector *> vertexSectors(level.vertices.size(),
@@ -253,11 +241,11 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
                               indexData,              // unsigned int* indexData
                               group.indices.size());  // long indexCount
 
-    // Assign texture from cache
-    std::map<std::string, OkTexture *>::iterator texIt =
-        textureCache.find(group.textureName);
-    if (texIt != textureCache.end()) {
-      item->setTexture(texIt->second);
+    // Get texture from texture handler
+    OkTexture *texture =
+        OkTextureHandler::getInstance()->getTexture(group.textureName);
+    if (texture) {
+      item->setTexture(group.textureName, texture);
       OkLogger::info("Assigned texture '" + group.textureName + "' to item '" +
                      itemName + "'");
     }
@@ -450,13 +438,13 @@ void WADRenderer::compositePatch(std::vector<unsigned char> &textureData,
         textureData[destIndex + 3] = 255;  // Full opacity
       }
 
-      // Debug first few pixels
-      if (x < 3 && y < 3) {
-        OkLogger::info("Pixel color at " + std::to_string(x) + "," +
-                       std::to_string(y) + ": " + std::to_string(color.r) +
-                       "," + std::to_string(color.g) + "," +
-                       std::to_string(color.b));
-      }
+      // // Debug first few pixels
+      // if (x < 3 && y < 3) {
+      //   OkLogger::info("Pixel color at " + std::to_string(x) + "," +
+      //                  std::to_string(y) + ": " + std::to_string(color.r) +
+      //                  "," + std::to_string(color.g) + "," +
+      //                  std::to_string(color.b));
+      // }
     }
   }
 }
@@ -472,15 +460,21 @@ void WADRenderer::createTextureFromDef(
 
   // Get texture name and trim it
   std::string texName(texDef.name);
-  while (!texName.empty() && texName[texName.size() - 1] == ' ') {
-    texName.resize(texName.size() - 1);
+  while (!texName.empty() && texName.back() == ' ') {
+    texName.pop_back();
   }
 
-  OkLogger::info("Creating texture: " + texName);
-  OkLogger::info("Texture size: " + std::to_string(texDef.width) + "x" +
-                 std::to_string(texDef.height));
-  OkLogger::info("Patch count: " + std::to_string(texDef.patches.size()));
-  OkLogger::info("Palette size: " + std::to_string(palette.size()));
+  // Check if texture already exists in handler
+  if (OkTextureHandler::getInstance()->getTexture(texName)) {
+    // OkLogger::info("WADRenderer :: Texture '" + texName +
+    //                "' already exists, skipping creation");
+    return;
+  }
+
+  OkLogger::info("WADRenderer :: Creating texture '" + texName +
+                 "' - Size: " + std::to_string(texDef.width) + "x" +
+                 std::to_string(texDef.height) +
+                 ", Patches: " + std::to_string(texDef.patches.size()));
 
   // Basic validation
   if (texDef.width <= 0 || texDef.height <= 0 || texDef.patches.empty() ||
@@ -525,19 +519,7 @@ void WADRenderer::createTextureFromDef(
     }
   }
 
-  // Create OpenGL texture even if some patches failed
-  OkTexture *texture = new OkTexture(texName);
-
-  if (!texture->createFromRawData(textureData.data(), texDef.width,
-                                  texDef.height, GL_RGBA)) {
-    OkLogger::error("Failed to create OpenGL texture: " + texName);
-    delete texture;
-    return;
-  }
-
-  // Add to cache even if it's partially broken
-  textureCache[texName] = texture;
-  OkLogger::info("Created texture: " + texName + " (" +
-                 std::to_string(texDef.width) + "x" +
-                 std::to_string(texDef.height) + ")");
+  // Create texture in handler
+  OkTextureHandler::getInstance()->getTextureFromRawData(
+      texName, textureData.data(), texDef.width, texDef.height, 4);
 }
