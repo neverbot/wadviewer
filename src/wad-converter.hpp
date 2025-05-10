@@ -23,12 +23,10 @@ private:
                          std::vector<float>        &vertices,
                          std::vector<unsigned int> &indices);
 
-  void createSectorGeometry(const WAD::Level &level,
-                            const WAD::Sector &sector,
+  void createSectorGeometry(const WAD::Level &level, const WAD::Sector &sector,
                             const std::vector<size_t> &sectorVertices,
-                            std::vector<float> &vertices,
-                            std::vector<unsigned int> &indices,
-                            bool isFloor);
+                            std::vector<float>        &vertices,
+                            std::vector<unsigned int> &indices, bool isFloor);
 
   void createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
                       const WAD::Sector &sector1, const WAD::Sector &sector2,
@@ -42,6 +40,10 @@ private:
   void compositePatch(std::vector<unsigned char> &textureData, int texWidth,
                       int texHeight, const WAD::PatchData &patch, int originX,
                       int originY, const std::vector<WAD::Color> &palette);
+
+  void createFlatTexture(const std::string             &flatName,
+                         const WAD::FlatData           &flatData,
+                         const std::vector<WAD::Color> &palette);
 };
 
 #endif

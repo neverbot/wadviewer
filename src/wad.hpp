@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <fstream>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -113,6 +114,11 @@ public:
     uint8_t r, g, b;
   };
 
+  struct FlatData {
+    std::string          name;
+    std::vector<uint8_t> data;  // Raw flat data (64x64 pixels)
+  };
+
   struct Level {
     std::string              name;
     std::vector<Vertex>      vertices;
@@ -124,6 +130,7 @@ public:
     std::vector<std::string> patch_names;   // PNAMES
     std::vector<TextureDef>  texture_defs;  // TEXTURE1/TEXTURE2
     std::vector<Color>       palette;       // PLAYPAL lump (256 colors)
+    std::vector<FlatData>    flats;         // Floor/ceiling textures
   };
 
   // Process and load all WAD data

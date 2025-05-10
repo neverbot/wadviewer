@@ -21,40 +21,42 @@ void WADConverter::createWallSection(const WAD::Vertex &vertex1,
                                      std::vector<float>        &vertices,
                                      std::vector<unsigned int> &indices) {
   // Calculate normalized positions
-  float x1 = (static_cast<float>(vertex1.x) - WADConverter::centerX) *
-             WADConverter::SCALE;
-  float z1 = (static_cast<float>(vertex1.y) - WADConverter::centerY) *
-             WADConverter::SCALE;
-  float x2 = (static_cast<float>(vertex2.x) - WADConverter::centerX) *
-             WADConverter::SCALE;
-  float z2 = (static_cast<float>(vertex2.y) - WADConverter::centerY) *
-             WADConverter::SCALE;
+  float x1 = (static_cast<float>(vertex1.x) - centerX) * SCALE;
+  float z1 = (static_cast<float>(vertex1.y) - centerY) * SCALE;
+  float x2 = (static_cast<float>(vertex2.x) - centerX) * SCALE;
+  float z2 = (static_cast<float>(vertex2.y) - centerY) * SCALE;
 
-  // Apply scale to heights
-  float wallBottom = bottomHeight * WADConverter::SCALE;
-  float wallTop    = topHeight * WADConverter::SCALE;
+  // Calculate wall dimensions
+  float wallBottom = bottomHeight * SCALE;
+  float wallTop    = topHeight * SCALE;
   float wallHeight = wallTop - wallBottom;
 
-  // Skip degenerate walls
   if (wallHeight <= 0.0f) {
     return;
   }
 
-  float wallLength = sqrt(pow(x2 - x1, 2) + pow(z2 - z1, 2));
+  // Calculate real-world wall length (before scaling)
+  float wallLength =
+      sqrt(pow(vertex2.x - vertex1.x, 2) + pow(vertex2.y - vertex1.y, 2));
 
-  // Texture coordinates
-  const float  TEXTURE_WIDTH  = 64.0f;
-  const float  TEXTURE_HEIGHT = 128.0f;
-  float        uOffset        = static_cast<float>(sidedef.x_offset);
-  float        vOffset        = static_cast<float>(sidedef.y_offset);
-  unsigned int baseIndex      = vertices.size() / 5;
+  // DOOM texture constants
+  const float TEXTURE_WIDTH  = 64.0f;
+  const float TEXTURE_HEIGHT = 128.0f;
 
+  // Calculate texture coordinates
+  float uOffset = static_cast<float>(sidedef.x_offset);
+  float vOffset = static_cast<float>(sidedef.y_offset);
+
+  // Calculate number of texture repeats based on unscaled wall length
+  float numRepeats = wallLength / TEXTURE_WIDTH;
+
+  // Apply texture coordinates
   float u1 = uOffset / TEXTURE_WIDTH;
-  float u2 = u1 + (wallLength / TEXTURE_WIDTH);
+  float u2 = u1 + numRepeats;
   float v1 = vOffset / TEXTURE_HEIGHT;
-  float v2 = v1 + (wallHeight / (TEXTURE_HEIGHT * WADConverter::SCALE));
+  float v2 = v1 + (wallHeight / (TEXTURE_HEIGHT * SCALE));
 
-  // Add vertices
+  // Add vertices with texture coordinates
   // Bottom left
   vertices.push_back(x1);
   vertices.push_back(wallBottom);
@@ -84,6 +86,7 @@ void WADConverter::createWallSection(const WAD::Vertex &vertex1,
   vertices.push_back(v2);
 
   // Add indices (CCW winding)
+  unsigned int baseIndex = vertices.size() / 5 - 4;  // We just added 4 vertices
   indices.push_back(baseIndex);
   indices.push_back(baseIndex + 1);
   indices.push_back(baseIndex + 2);
@@ -99,284 +102,306 @@ void WADConverter::createWallSection(const WAD::Vertex &vertex1,
  */
 std::vector<OkItem *>
 WADConverter::createLevelGeometry(const WAD::Level &level) {
-    std::vector<OkItem *> items;
+  std::vector<OkItem *> items;
 
-    // Calculate level bounds and set center
-    float minX = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::lowest();
-    float minY = std::numeric_limits<float>::max();
-    float maxY = std::numeric_limits<float>::lowest();
+  // Calculate level bounds and set center
+  float minX = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float minY = std::numeric_limits<float>::max();
+  float maxY = std::numeric_limits<float>::lowest();
 
-    for (size_t i = 0; i < level.vertices.size(); ++i) {
-        const WAD::Vertex &vertex = level.vertices[i];
-        minX = std::min(minX, static_cast<float>(vertex.x));
-        maxX = std::max(maxX, static_cast<float>(vertex.x));
-        minY = std::min(minY, static_cast<float>(vertex.y));
-        maxY = std::max(maxY, static_cast<float>(vertex.y));
+  for (size_t i = 0; i < level.vertices.size(); ++i) {
+    const WAD::Vertex &vertex = level.vertices[i];
+    minX                      = std::min(minX, static_cast<float>(vertex.x));
+    maxX                      = std::max(maxX, static_cast<float>(vertex.x));
+    minY                      = std::min(minY, static_cast<float>(vertex.y));
+    maxY                      = std::max(maxY, static_cast<float>(vertex.y));
+  }
+
+  centerX = (minX + maxX) / 2.0f;
+  centerY = (minY + maxY) / 2.0f;
+
+  // First, load all textures we'll need
+  for (const WAD::Sidedef &sidedef : level.sidedefs) {
+    std::string upperTex = OkStrings::trimFixedString(sidedef.upper_texture, 8);
+    std::string middleTex =
+        OkStrings::trimFixedString(sidedef.middle_texture, 8);
+    std::string lowerTex = OkStrings::trimFixedString(sidedef.lower_texture, 8);
+
+    // Also get floor/ceiling textures
+    if (sidedef.sector < level.sectors.size()) {
+      const WAD::Sector &sector = level.sectors[sidedef.sector];
+      std::string        floorTex =
+          OkStrings::trimFixedString(sector.floor_texture, 8);
+      std::string ceilTex =
+          OkStrings::trimFixedString(sector.ceiling_texture, 8);
+
+      // Load all needed textures
+      for (const WAD::TextureDef &texDef : level.texture_defs) {
+        std::string texName = OkStrings::trimFixedString(texDef.name, 8);
+        if (!texName.empty() && (texName == upperTex || texName == middleTex ||
+                                 texName == lowerTex || texName == floorTex ||
+                                 texName == ceilTex)) {
+          createTextureFromDef(texDef, level.patches, level.palette);
+        }
+      }
+    }
+  }
+
+  // Track vertices for each sector
+  std::vector<std::vector<size_t>> sectorVertices(level.sectors.size());
+
+  // Structure to hold geometry for each texture
+  struct GeometryGroup {
+    std::vector<float>        vertices;
+    std::vector<unsigned int> indices;
+    std::string               textureName;
+  };
+  std::map<std::string, GeometryGroup> geometryGroups;
+
+  // First pass: collect vertices for each sector and create walls
+  for (size_t i = 0; i < level.linedefs.size(); i++) {
+    const WAD::Linedef &linedef = level.linedefs[i];
+
+    // Skip invalid vertex indices
+    if (linedef.start_vertex >= level.vertices.size() ||
+        linedef.end_vertex >= level.vertices.size()) {
+      continue;
     }
 
-    centerX = (minX + maxX) / 2.0f;
-    centerY = (minY + maxY) / 2.0f;
+    const WAD::Vertex &v1 = level.vertices[linedef.start_vertex];
+    const WAD::Vertex &v2 = level.vertices[linedef.end_vertex];
 
-    // First, load all textures we'll need
-    for (const WAD::Sidedef &sidedef : level.sidedefs) {
-        std::string upperTex = OkStrings::trimFixedString(sidedef.upper_texture, 8);
-        std::string middleTex = OkStrings::trimFixedString(sidedef.middle_texture, 8);
-        std::string lowerTex = OkStrings::trimFixedString(sidedef.lower_texture, 8);
+    // Handle right side (always present for valid linedefs)
+    if (linedef.right_sidedef != 0xFFFF &&
+        linedef.right_sidedef < level.sidedefs.size()) {
+      const WAD::Sidedef &rightSide = level.sidedefs[linedef.right_sidedef];
 
-        // Also get floor/ceiling textures
-        if (sidedef.sector < level.sectors.size()) {
-            const WAD::Sector &sector = level.sectors[sidedef.sector];
-            std::string floorTex = OkStrings::trimFixedString(sector.floor_texture, 8);
-            std::string ceilTex = OkStrings::trimFixedString(sector.ceiling_texture, 8);
+      if (rightSide.sector < level.sectors.size()) {
+        // Add vertices to sector
+        sectorVertices[rightSide.sector].push_back(linedef.start_vertex);
+        sectorVertices[rightSide.sector].push_back(linedef.end_vertex);
 
-            // Load all needed textures
-            for (const WAD::TextureDef &texDef : level.texture_defs) {
-                std::string texName = OkStrings::trimFixedString(texDef.name, 8);
-                if (!texName.empty() && (texName == upperTex || texName == middleTex || 
-                    texName == lowerTex || texName == floorTex || texName == ceilTex)) {
-                    createTextureFromDef(texDef, level.patches, level.palette);
-                }
+        // Handle two-sided linedef case
+        if (linedef.left_sidedef != 0xFFFF &&
+            linedef.left_sidedef < level.sidedefs.size()) {
+          const WAD::Sidedef &leftSide = level.sidedefs[linedef.left_sidedef];
+
+          if (leftSide.sector < level.sectors.size()) {
+            const WAD::Sector &sector1 = level.sectors[leftSide.sector];
+            const WAD::Sector &sector2 = level.sectors[rightSide.sector];
+
+            // Create upper wall if ceilings differ
+            if (sector1.ceiling_height > sector2.ceiling_height) {
+              std::string textureName =
+                  OkStrings::trimFixedString(rightSide.upper_texture, 8);
+              if (!textureName.empty() && textureName != "-") {
+                GeometryGroup &group = geometryGroups[textureName];
+                group.textureName    = textureName;
+                createWallSection(v1, v2, sector2.ceiling_height,
+                                  sector1.ceiling_height, rightSide,
+                                  group.vertices, group.indices);
+              }
             }
-        }
-    }
 
-    // Track vertices for each sector
-    std::vector<std::vector<size_t>> sectorVertices(level.sectors.size());
-
-    // Structure to hold geometry for each texture
-    struct GeometryGroup {
-        std::vector<float> vertices;
-        std::vector<unsigned int> indices;
-        std::string textureName;
-    };
-    std::map<std::string, GeometryGroup> geometryGroups;
-
-    // First pass: collect vertices for each sector and create walls
-    for (size_t i = 0; i < level.linedefs.size(); i++) {
-        const WAD::Linedef &linedef = level.linedefs[i];
-
-        // Skip invalid vertex indices
-        if (linedef.start_vertex >= level.vertices.size() || 
-            linedef.end_vertex >= level.vertices.size()) {
-            continue;
-        }
-
-        const WAD::Vertex &v1 = level.vertices[linedef.start_vertex];
-        const WAD::Vertex &v2 = level.vertices[linedef.end_vertex];
-
-        // Handle right side (always present for valid linedefs)
-        if (linedef.right_sidedef != 0xFFFF && 
-            linedef.right_sidedef < level.sidedefs.size()) {
-            const WAD::Sidedef &rightSide = level.sidedefs[linedef.right_sidedef];
-            
-            if (rightSide.sector < level.sectors.size()) {
-                // Add vertices to sector
-                sectorVertices[rightSide.sector].push_back(linedef.start_vertex);
-                sectorVertices[rightSide.sector].push_back(linedef.end_vertex);
-
-                // Handle two-sided linedef case
-                if (linedef.left_sidedef != 0xFFFF && 
-                    linedef.left_sidedef < level.sidedefs.size()) {
-                    const WAD::Sidedef &leftSide = level.sidedefs[linedef.left_sidedef];
-                    
-                    if (leftSide.sector < level.sectors.size()) {
-                        const WAD::Sector &sector1 = level.sectors[leftSide.sector];
-                        const WAD::Sector &sector2 = level.sectors[rightSide.sector];
-
-                        // Create upper wall if ceilings differ
-                        if (sector1.ceiling_height > sector2.ceiling_height) {
-                            std::string textureName = OkStrings::trimFixedString(rightSide.upper_texture, 8);
-                            if (!textureName.empty() && textureName != "-") {
-                                GeometryGroup &group = geometryGroups[textureName];
-                                group.textureName = textureName;
-                                createWallSection(v1, v2, sector2.ceiling_height, sector1.ceiling_height,
-                                                rightSide, group.vertices, group.indices);
-                            }
-                        }
-
-                        // Create lower wall if floors differ
-                        if (sector2.floor_height > sector1.floor_height) {
-                            std::string textureName = OkStrings::trimFixedString(rightSide.lower_texture, 8);
-                            if (!textureName.empty() && textureName != "-") {
-                                GeometryGroup &group = geometryGroups[textureName];
-                                group.textureName = textureName;
-                                createWallSection(v1, v2, sector1.floor_height, sector2.floor_height,
-                                                rightSide, group.vertices, group.indices);
-                            }
-                        }
-
-                        // Create middle wall in gaps
-                        std::string middleTexName = OkStrings::trimFixedString(rightSide.middle_texture, 8);
-                        if (!middleTexName.empty() && middleTexName != "-") {
-                            float upperWallBottom = sector2.ceiling_height;
-                            float lowerWallTop = sector2.floor_height;
-                            
-                            if ((sector1.ceiling_height == sector2.ceiling_height && 
-                                 sector1.floor_height == sector2.floor_height) ||
-                                (upperWallBottom > lowerWallTop)) {
-                                
-                                float bottom = std::max(sector1.floor_height, sector2.floor_height);
-                                float top = std::min(sector1.ceiling_height, sector2.ceiling_height);
-                                
-                                if (top > bottom) {
-                                    GeometryGroup &group = geometryGroups[middleTexName];
-                                    group.textureName = middleTexName;
-                                    createWallSection(v1, v2, bottom, top, rightSide, 
-                                                    group.vertices, group.indices);
-                                }
-                            }
-                        }
-                    }
-                }
-                // One-sided linedef case
-                else {
-                    const WAD::Sector &sector = level.sectors[rightSide.sector];
-                    std::string textureName = OkStrings::trimFixedString(rightSide.middle_texture, 8);
-                    if (!textureName.empty() && textureName != "-") {
-                        GeometryGroup &group = geometryGroups[textureName];
-                        group.textureName = textureName;
-                        createWallSection(v1, v2, sector.floor_height, sector.ceiling_height,
-                                        rightSide, group.vertices, group.indices);
-                    }
-                }
+            // Create lower wall if floors differ
+            if (sector2.floor_height > sector1.floor_height) {
+              std::string textureName =
+                  OkStrings::trimFixedString(rightSide.lower_texture, 8);
+              if (!textureName.empty() && textureName != "-") {
+                GeometryGroup &group = geometryGroups[textureName];
+                group.textureName    = textureName;
+                createWallSection(v1, v2, sector1.floor_height,
+                                  sector2.floor_height, rightSide,
+                                  group.vertices, group.indices);
+              }
             }
+
+            // Create middle wall in gaps
+            std::string middleTexName =
+                OkStrings::trimFixedString(rightSide.middle_texture, 8);
+            if (!middleTexName.empty() && middleTexName != "-") {
+              float upperWallBottom = sector2.ceiling_height;
+              float lowerWallTop    = sector2.floor_height;
+
+              if ((sector1.ceiling_height == sector2.ceiling_height &&
+                   sector1.floor_height == sector2.floor_height) ||
+                  (upperWallBottom > lowerWallTop)) {
+
+                float bottom =
+                    std::max(sector1.floor_height, sector2.floor_height);
+                float top =
+                    std::min(sector1.ceiling_height, sector2.ceiling_height);
+
+                if (top > bottom) {
+                  GeometryGroup &group = geometryGroups[middleTexName];
+                  group.textureName    = middleTexName;
+                  createWallSection(v1, v2, bottom, top, rightSide,
+                                    group.vertices, group.indices);
+                }
+              }
+            }
+          }
         }
+        // One-sided linedef case
+        else {
+          const WAD::Sector &sector = level.sectors[rightSide.sector];
+          std::string        textureName =
+              OkStrings::trimFixedString(rightSide.middle_texture, 8);
+          if (!textureName.empty() && textureName != "-") {
+            GeometryGroup &group = geometryGroups[textureName];
+            group.textureName    = textureName;
+            createWallSection(v1, v2, sector.floor_height,
+                              sector.ceiling_height, rightSide, group.vertices,
+                              group.indices);
+          }
+        }
+      }
+    }
+  }
+
+  // Second pass: create floor and ceiling geometry for each sector
+  for (size_t i = 0; i < level.sectors.size(); i++) {
+    const WAD::Sector &sector = level.sectors[i];
+
+    // Remove duplicate vertices
+    std::sort(sectorVertices[i].begin(), sectorVertices[i].end());
+    sectorVertices[i].erase(
+        std::unique(sectorVertices[i].begin(), sectorVertices[i].end()),
+        sectorVertices[i].end());
+
+    // Create floor
+    std::string floorTexName =
+        OkStrings::trimFixedString(sector.floor_texture, 8);
+    if (!floorTexName.empty() && floorTexName != "-") {
+      GeometryGroup &group = geometryGroups[floorTexName];
+      group.textureName    = floorTexName;
+      createSectorGeometry(level, sector, sectorVertices[i], group.vertices,
+                           group.indices, true);
     }
 
-    // Second pass: create floor and ceiling geometry for each sector
-    for (size_t i = 0; i < level.sectors.size(); i++) {
-        const WAD::Sector &sector = level.sectors[i];
-        
-        // Remove duplicate vertices
-        std::sort(sectorVertices[i].begin(), sectorVertices[i].end());
-        sectorVertices[i].erase(
-            std::unique(sectorVertices[i].begin(), sectorVertices[i].end()),
-            sectorVertices[i].end()
-        );
+    // Create ceiling
+    std::string ceilingTexName =
+        OkStrings::trimFixedString(sector.ceiling_texture, 8);
+    if (!ceilingTexName.empty() && ceilingTexName != "-") {
+      GeometryGroup &group = geometryGroups[ceilingTexName];
+      group.textureName    = ceilingTexName;
+      createSectorGeometry(level, sector, sectorVertices[i], group.vertices,
+                           group.indices, false);
+    }
+  }
 
-        // Create floor
-        std::string floorTexName = OkStrings::trimFixedString(sector.floor_texture, 8);
-        if (!floorTexName.empty() && floorTexName != "-") {
-            GeometryGroup &group = geometryGroups[floorTexName];
-            group.textureName = floorTexName;
-            createSectorGeometry(level, sector, sectorVertices[i], group.vertices, 
-                               group.indices, true);
-        }
+  // Create OkItems from geometry groups
+  for (std::map<std::string, GeometryGroup>::iterator it =
+           geometryGroups.begin();
+       it != geometryGroups.end(); ++it) {
+    const GeometryGroup &group = it->second;
 
-        // Create ceiling
-        std::string ceilingTexName = OkStrings::trimFixedString(sector.ceiling_texture, 8);
-        if (!ceilingTexName.empty() && ceilingTexName != "-") {
-            GeometryGroup &group = geometryGroups[ceilingTexName];
-            group.textureName = ceilingTexName;
-            createSectorGeometry(level, sector, sectorVertices[i], group.vertices, 
-                               group.indices, false);
-        }
+    if (group.vertices.empty() || group.indices.empty()) {
+      continue;
     }
 
-    // Create OkItems from geometry groups
-    for (std::map<std::string, GeometryGroup>::iterator it = geometryGroups.begin();
-         it != geometryGroups.end(); ++it) {
-        const GeometryGroup &group = it->second;
+    std::string   itemName   = "level_" + group.textureName;
+    float        *vertexData = new float[group.vertices.size()];
+    unsigned int *indexData  = new unsigned int[group.indices.size()];
 
-        if (group.vertices.empty() || group.indices.empty()) {
-            continue;
-        }
-
-        std::string itemName = "level_" + group.textureName;
-        float *vertexData = new float[group.vertices.size()];
-        unsigned int *indexData = new unsigned int[group.indices.size()];
-
-        // Copy vertex and index data
-        for (size_t i = 0; i < group.vertices.size(); ++i) {
-            vertexData[i] = group.vertices[i];
-        }
-        for (size_t i = 0; i < group.indices.size(); ++i) {
-            indexData[i] = group.indices[i];
-        }
-
-        OkItem *item = new OkItem(itemName, vertexData, group.vertices.size(),
-                                 indexData, group.indices.size());
-
-        OkTexture *texture = OkTextureHandler::getInstance()->getTexture(group.textureName);
-        if (texture) {
-            item->setTexture(group.textureName, texture);
-            OkLogger::info("Assigned texture '" + group.textureName + "' to item '" +
-                          itemName + "'");
-        } else {
-            OkLogger::error("Could not find texture '" + group.textureName +
-                          "' for item '" + itemName + "'");
-        }
-
-        items.push_back(item);
+    // Copy vertex and index data
+    for (size_t i = 0; i < group.vertices.size(); ++i) {
+      vertexData[i] = group.vertices[i];
+    }
+    for (size_t i = 0; i < group.indices.size(); ++i) {
+      indexData[i] = group.indices[i];
     }
 
-    return items;
+    OkItem *item = new OkItem(itemName, vertexData, group.vertices.size(),
+                              indexData, group.indices.size());
+
+    OkTexture *texture =
+        OkTextureHandler::getInstance()->getTexture(group.textureName);
+    if (texture) {
+      item->setTexture(group.textureName, texture);
+      OkLogger::info("Assigned texture '" + group.textureName + "' to item '" +
+                     itemName + "'");
+    } else {
+      OkLogger::error("Could not find texture '" + group.textureName +
+                      "' for item '" + itemName + "'");
+    }
+
+    items.push_back(item);
+  }
+
+  return items;
 }
 
-void WADConverter::createSectorGeometry(const WAD::Level &level,
-                                      const WAD::Sector &sector,
-                                      const std::vector<size_t> &sectorVertices,
-                                      std::vector<float> &vertices,
-                                      std::vector<unsigned int> &indices,
-                                      bool isFloor) {
-    if (sectorVertices.size() < 3) {
-        return;  // Need at least 3 vertices to form a polygon
+void WADConverter::createSectorGeometry(
+    const WAD::Level &level, const WAD::Sector &sector,
+    const std::vector<size_t> &sectorVertices, std::vector<float> &vertices,
+    std::vector<unsigned int> &indices, bool isFloor) {
+
+  if (sectorVertices.size() < 3) {
+    return;  // Need at least 3 vertices to form a polygon
+  }
+
+  float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
+                         : static_cast<float>(sector.ceiling_height) * SCALE;
+
+  // First create all vertices for the sector
+  unsigned int baseIndex    = vertices.size() / 5;  // 5 floats per vertex
+  const float  TEXTURE_SIZE = 64.0f;  // DOOM uses 64x64 flat textures
+
+  // Calculate sector bounds for texture mapping
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+
+  // First pass - get bounds for texture coordinates
+  for (size_t i = 0; i < sectorVertices.size(); ++i) {
+    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+    float              worldX = static_cast<float>(vertex.x);
+    float              worldY = static_cast<float>(vertex.y);
+
+    minX = std::min(minX, worldX);
+    maxX = std::max(maxX, worldX);
+    minY = std::min(minY, worldY);
+    maxY = std::max(maxY, worldY);
+  }
+
+  // Create vertices with proper texture coordinates
+  for (size_t i = 0; i < sectorVertices.size(); ++i) {
+    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+    float              x = (static_cast<float>(vertex.x) - centerX) * SCALE;
+    float              z = (static_cast<float>(vertex.y) - centerY) * SCALE;
+
+    // Calculate UV coordinates based on world position
+    float u = fmod((vertex.x - minX) / TEXTURE_SIZE, 1.0f);
+    float v = fmod((vertex.y - minY) / TEXTURE_SIZE, 1.0f);
+
+    if (!isFloor) {
+      v = 1.0f - v;  // Flip V coordinate for ceiling
     }
 
-    float height = isFloor ? 
-        static_cast<float>(sector.floor_height) * SCALE :
-        static_cast<float>(sector.ceiling_height) * SCALE;
+    vertices.push_back(x);
+    vertices.push_back(height);
+    vertices.push_back(-z);
+    vertices.push_back(u);
+    vertices.push_back(v);
+  }
 
-    // Create triangles using a simple fan triangulation
-    // This works for convex polygons, which most DOOM sectors are
-    unsigned int baseIndex = vertices.size() / 5;  // 5 floats per vertex
-
-    // Calculate center point for texture coordinates by averaging sector vertices
-    float avgX = 0.0f, avgY = 0.0f;
-    for (size_t i = 0; i < sectorVertices.size(); ++i) {
-        const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-        avgX += static_cast<float>(vertex.x);
-        avgY += static_cast<float>(vertex.y);
+  // Create triangles using a simple triangle fan
+  for (size_t i = 1; i < sectorVertices.size() - 1; ++i) {
+    if (isFloor) {
+      // Floor - CCW winding
+      indices.push_back(baseIndex);          // Center
+      indices.push_back(baseIndex + i);      // Current
+      indices.push_back(baseIndex + i + 1);  // Next
+    } else {
+      // Ceiling - Reverse winding
+      indices.push_back(baseIndex);          // Center
+      indices.push_back(baseIndex + i + 1);  // Next
+      indices.push_back(baseIndex + i);      // Current
     }
-    avgX /= sectorVertices.size();
-    avgY /= sectorVertices.size();
-
-    const float TEXTURE_SIZE = 64.0f;  // Standard DOOM texture size
-
-    // Add all vertices with proper texture coordinates
-    for (size_t i = 0; i < sectorVertices.size(); ++i) {
-        const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-        float x = (static_cast<float>(vertex.x) - centerX) * SCALE;
-        float z = (static_cast<float>(vertex.y) - centerY) * SCALE;
-
-        // Calculate texture coordinates based on distance from center
-        float u = (x - (avgX - centerX) * SCALE) / TEXTURE_SIZE;
-        float v = (z - (avgY - centerY) * SCALE) / TEXTURE_SIZE;
-        if (!isFloor) {
-            v = -v;  // Flip V coordinate for ceiling
-        }
-
-        vertices.push_back(x);
-        vertices.push_back(height);
-        vertices.push_back(-z);  // Negate Z for OpenGL coordinate system
-        vertices.push_back(u);
-        vertices.push_back(v);
-
-        // Add indices for triangle fan
-        if (i >= 2) {
-            if (isFloor) {
-                indices.push_back(baseIndex);      // Center
-                indices.push_back(baseIndex + i - 1);
-                indices.push_back(baseIndex + i);
-            } else {
-                // Reverse winding for ceiling
-                indices.push_back(baseIndex);      // Center
-                indices.push_back(baseIndex + i);
-                indices.push_back(baseIndex + i - 1);
-            }
-        }
-    }
+  }
 }
 
 /**
@@ -567,6 +592,57 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
       // }
     }
   }
+}
+
+/**
+ * @brief Create an OpenGL texture from a flat (floor/ceiling) texture name.
+ * @param flatName The name of the flat texture to create.
+ * @param flatData The flat data to use.
+ * @param palette The color palette to use.
+ */
+void WADConverter::createFlatTexture(const std::string             &flatName,
+                                     const WAD::FlatData           &flatData,
+                                     const std::vector<WAD::Color> &palette) {
+  // Check if texture already exists in handler
+  if (OkTextureHandler::getInstance()->getTexture(flatName)) {
+    return;
+  }
+
+  // DOOM flats are always 64x64
+  const int FLAT_SIZE = 64;
+
+  // Validate flat data size
+  if (flatData.data.size() != FLAT_SIZE * FLAT_SIZE) {
+    OkLogger::error("Invalid flat size for '" + flatName + "': " +
+                    std::to_string(flatData.data.size()) + " (expected " +
+                    std::to_string(FLAT_SIZE * FLAT_SIZE) + ")");
+    return;
+  }
+
+  // Create texture data (RGBA format)
+  std::vector<unsigned char> textureData(FLAT_SIZE * FLAT_SIZE * 4, 0);
+
+  // Convert flat data to RGBA using the palette
+  for (size_t i = 0; i < FLAT_SIZE * FLAT_SIZE; ++i) {
+    uint8_t colorIndex = flatData.data[i];
+    if (colorIndex >= palette.size()) {
+      continue;
+    }
+
+    const WAD::Color &color = palette[colorIndex];
+    size_t            idx   = i * 4;
+    textureData[idx + 0]    = color.r;
+    textureData[idx + 1]    = color.g;
+    textureData[idx + 2]    = color.b;
+    textureData[idx + 3]    = 255;  // Full opacity
+  }
+
+  // Create the texture through the handler
+  OkTextureHandler::getInstance()->createTextureFromRawData(
+      flatName, textureData.data(), FLAT_SIZE, FLAT_SIZE, 4);
+
+  OkLogger::info("WADConverter :: Created flat texture '" + flatName +
+                 "' (64x64)");
 }
 
 /**

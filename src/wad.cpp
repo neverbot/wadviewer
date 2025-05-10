@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <set>
 #include <sstream>
 
 /**
@@ -557,6 +558,37 @@ void WAD::processWAD() {
       }
       if (findLump("THINGS", vOffset, vSize, i + 1)) {
         level.things = readThings(vOffset, vSize);
+      }
+
+      // Load all unique flat textures referenced by sectors
+      std::set<std::string> uniqueFlats;
+      for (size_t j = 0; j < level.sectors.size(); j++) {
+        std::string floorTex =
+            OkStrings::trimFixedString(level.sectors[j].floor_texture, 8);
+        std::string ceilTex =
+            OkStrings::trimFixedString(level.sectors[j].ceiling_texture, 8);
+
+        if (!floorTex.empty() && floorTex != "-") {
+          uniqueFlats.insert(floorTex);
+        }
+        if (!ceilTex.empty() && ceilTex != "-") {
+          uniqueFlats.insert(ceilTex);
+        }
+      }
+
+      // Load each unique flat texture
+      for (std::set<std::string>::iterator it = uniqueFlats.begin();
+           it != uniqueFlats.end(); ++it) {
+        uint32_t offset, size;
+        if (findLump(*it, offset, size, 0)) {
+          std::vector<uint8_t> flatData = readLump(offset, size);
+          if (flatData.size() == 64 * 64) {  // DOOM flats are always 64x64
+            FlatData flat;
+            flat.name = *it;
+            flat.data = flatData;
+            level.flats.push_back(flat);
+          }
+        }
       }
 
       levels_.push_back(level);
