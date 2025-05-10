@@ -65,7 +65,7 @@ void WAD::readDirectory() {
 }
 
 bool WAD::isLevelMarker(const std::string &name) const {
-  std::string cleanName = OkStrings::trim(name);
+  std::string cleanName = OkStrings::trimFixedString(name, 8);
 
   // DOOM 1 level names are ExMy (x = episode, y = mission)
   if (cleanName.length() == 4 && cleanName[0] == 'E' && cleanName[2] == 'M' &&
@@ -531,10 +531,7 @@ void WAD::processWAD() {
 
   // Now process levels (using the loaded textures/patches)
   for (size_t i = 0; i < directory_.size(); i++) {
-    std::string lumpName(directory_[i].name, 8);
-    while (!lumpName.empty() && lumpName.back() == ' ') {
-      lumpName.pop_back();
-    }
+    std::string lumpName = OkStrings::trimFixedString(directory_[i].name, 8);
 
     if (isLevelMarker(lumpName)) {
       Level level;
@@ -847,11 +844,9 @@ std::string WAD::toJSON() const {
 WAD::Level WAD::getLevel(std::string name) const {
   std::cout << "WAD :: Looking for level: '" << name << "'...";
 
-  name = OkStrings::trim(name);
-
+  // Exact string comparison without extra trimming
   for (size_t i = 0; i < levels_.size(); i++) {
-    std::string levelName = OkStrings::trim(levels_[i].name);
-    if (levelName == name) {
+    if (levels_[i].name == name) {
       std::cout << " found!\n";
       return levels_[i];
     }
