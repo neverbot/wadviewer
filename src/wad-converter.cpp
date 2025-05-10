@@ -69,14 +69,14 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
     }
   }
 
-  // Pre-load all textures needed for this level
+  // First, load all textures needed for this level
   for (const WAD::Sidedef &sidedef : level.sidedefs) {
     // Get texture names from sidedef (upper, middle, lower)
     std::string upperTex(sidedef.upper_texture, 8);
     std::string middleTex(sidedef.middle_texture, 8);
     std::string lowerTex(sidedef.lower_texture, 8);
 
-    // Trim trailing spaces
+    // Trim texture names
     while (!upperTex.empty() && upperTex.back() == ' ')
       upperTex.pop_back();
     while (!middleTex.empty() && middleTex.back() == ' ')
@@ -190,27 +190,28 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
       }
 
       // Trim texture name
-      while (!textureName.empty() && textureName.back() == ' ') {
+      while (!textureName.empty() && textureName.back() == ' ')
         textureName.pop_back();
+
+      // Skip invalid/empty texture names
+      if (textureName.empty() || textureName == "-") {
+        continue;
       }
 
-      if (!textureName.empty()) {
-        // Get or create geometry group for this texture
-        GeometryGroup &group = geometryGroups[textureName];
-        group.textureName    = textureName;
+      // Get or create geometry group for this texture
+      GeometryGroup &group = geometryGroups[textureName];
+      group.textureName    = textureName;
 
-        // Add geometry to the appropriate group
-        const WAD::Vertex &v1 = level.vertices[linedef.start_vertex];
-        const WAD::Vertex &v2 = level.vertices[linedef.end_vertex];
-        createWallFace(v1, v2, sector1, sector2, rightSide, group.vertices,
-                       group.indices);
-      }
+      // Add geometry to the appropriate group
+      const WAD::Vertex &v1 = level.vertices[linedef.start_vertex];
+      const WAD::Vertex &v2 = level.vertices[linedef.end_vertex];
+      createWallFace(v1, v2, sector1, sector2, rightSide, group.vertices,
+                     group.indices);
     }
   }
 
   // Create items from geometry groups
   std::vector<OkItem *> items;
-
   for (std::map<std::string, GeometryGroup>::iterator it =
            geometryGroups.begin();
        it != geometryGroups.end(); ++it) {
@@ -220,13 +221,11 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
       continue;
     }
 
-    // Create item for this geometry group
-    std::string itemName = "level_" + group.textureName;
-    // Create non-const copies of the vertex and index data
+    std::string   itemName   = "level_" + group.textureName;
     float        *vertexData = new float[group.vertices.size()];
     unsigned int *indexData  = new unsigned int[group.indices.size()];
 
-    // Copy the data
+    // Copy vertex and index data
     for (size_t i = 0; i < group.vertices.size(); ++i) {
       vertexData[i] = group.vertices[i];
     }
@@ -234,15 +233,10 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
       indexData[i] = group.indices[i];
     }
 
-    // Create item with the copied data
-    OkItem *item = new OkItem(itemName,
-                              vertexData,             // float* vertexData
-                              group.vertices.size(),  // long vertexCount
-                              indexData,              // unsigned int* indexData
-                              group.indices.size());  // long indexCount
+    OkItem *item = new OkItem(itemName, vertexData, group.vertices.size(),
+                              indexData, group.indices.size());
 
-    // Get texture from texture handler - just look it up since it should
-    // already exist
+    // Look up texture using consistent name
     OkTexture *texture =
         OkTextureHandler::getInstance()->getTexture(group.textureName);
     if (texture) {
@@ -463,37 +457,34 @@ void WADConverter::createTextureFromDef(
     const std::vector<WAD::Color> &palette) {
 
   // Get texture name and trim it
-  std::string texName(texDef.name);
+  std::string texName(texDef.name, 8);  // Use fixed size to match WAD format
   while (!texName.empty() && texName.back() == ' ') {
     texName.pop_back();
   }
 
   // Check if texture already exists in handler
   if (OkTextureHandler::getInstance()->getTexture(texName)) {
-    // OkLogger::info("WADConverter :: Texture '" + texName +
-    //                "' already exists, skipping creation");
     return;
   }
 
   // Basic validation
-  if (texDef.width <= 0 || texDef.height <= 0 || texDef.patches.empty() ||
-      palette.empty()) {
+  if (texDef.width <= 0 || texDef.height <= 0 || palette.empty()) {
     OkLogger::error("Invalid texture definition for " + texName);
     return;
   }
 
-  // Create empty texture of required size with default color (to handle missing
-  // patches)
+  // Create empty texture data with default color (to handle missing patches)
   std::vector<unsigned char> textureData(texDef.width * texDef.height * 4, 128);
 
   // Count valid patches
   size_t validPatchCount = 0;
+  bool   hasValidPatches = false;
 
   // For each patch in the texture
   for (size_t i = 0; i < texDef.patches.size(); i++) {
     const WAD::PatchInTexture &patchInfo = texDef.patches[i];
 
-    // Skip invalid patch indices instead of failing
+    // Skip invalid patch indices
     if (patchInfo.patch_num >= patches.size()) {
       OkLogger::warning("Skipping invalid patch index " +
                         std::to_string(patchInfo.patch_num) + " in texture " +
@@ -504,12 +495,14 @@ void WADConverter::createTextureFromDef(
     // Get patch data
     const WAD::PatchData &patchData = patches[patchInfo.patch_num];
 
-    // Skip invalid patches
+    // Skip invalid patches but don't fail the texture
     if (patchData.pixels.empty() || patchData.width <= 0 ||
         patchData.height <= 0) {
       OkLogger::warning("Skipping invalid patch data in texture " + texName);
       continue;
     }
+
+    hasValidPatches = true;
 
     try {
       // Composite patch onto texture at (origin_x, origin_y)
@@ -523,8 +516,8 @@ void WADConverter::createTextureFromDef(
     }
   }
 
-  // Only create texture if we have at least one valid patch
-  if (validPatchCount > 0) {
+  // Create texture even if some patches failed, as long as we have valid data
+  if (hasValidPatches) {
     OkLogger::info("WADConverter :: Creating texture '" + texName + "' (" +
                    std::to_string(texDef.width) + "x" +
                    std::to_string(texDef.height) +
