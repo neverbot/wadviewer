@@ -560,6 +560,15 @@ void WAD::processWAD() {
         level.things = readThings(vOffset, vSize);
       }
 
+      // Load player start position (Thing type 1)
+      for (size_t j = 0; j < level.things.size(); j++) {
+        if (level.things[j].type == 1) {
+          level.has_player_start = true;
+          level.player_start     = level.things[j];
+          break;
+        }
+      }
+
       // Load all unique flat textures referenced by sectors
       std::set<std::string> uniqueFlats;
       for (size_t j = 0; j < level.sectors.size(); j++) {

@@ -280,6 +280,18 @@ int main(int argc, char *argv[]) {
     WADConverter          converter;
     std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
 
+    // Create a secondary camera in the player start position
+    OkPoint  *playerStart = converter.getPlayerStartPosition(level);
+    OkCamera *povCamera   = new OkCamera(OkConfig::getInt("window.width"),
+                                         OkConfig::getInt("window.height"));
+
+    OkCore::addCamera(povCamera);
+    povCamera->setSpeed(cameraSpeed, cameraSpeed,
+                        cameraSpeed);  // Set speed in all directions
+    povCamera->setPosition(*playerStart);
+    povCamera->setRotation(0.0f, 0.0f, 0.0f);
+    povCamera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
+
     for (size_t i = 0; i < levelItems.size(); ++i) {
       levelItems[i]->setWireframe(false);
       scene->addItem(levelItems[i]);

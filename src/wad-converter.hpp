@@ -11,11 +11,19 @@ public:
   ~WADConverter();
 
   std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
+  OkPoint              *getPlayerStartPosition(const WAD::Level &level);
 
 private:
   static float       centerX;
   static float       centerY;
   static const float SCALE;
+
+  // Helper method to check if a point is inside a sector boundary line
+  static bool pointInSector(int16_t px, int16_t py, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+    // Check if point is on the right side of the line
+    // Using the sign of cross product: (x2-x1)(py-y1) - (y2-y1)(px-x1)
+    return ((x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)) > 0;
+  }
 
   void createWallSection(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
                          float bottomHeight, float topHeight,

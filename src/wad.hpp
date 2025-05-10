@@ -121,12 +121,17 @@ public:
   };
 
   struct Level {
-    char                     name[8];
-    std::vector<Vertex>      vertices;
-    std::vector<Linedef>     linedefs;
-    std::vector<Sidedef>     sidedefs;
-    std::vector<Sector>      sectors;
-    std::vector<Thing>       things;
+    char name[8];
+    // Initial player position and angle
+    Thing player_start;  // Player 1 start position (Thing type 1)
+    bool  has_player_start;
+    // Level geometry
+    std::vector<Vertex>  vertices;
+    std::vector<Linedef> linedefs;
+    std::vector<Sidedef> sidedefs;
+    std::vector<Sector>  sectors;
+    std::vector<Thing>   things;
+    // Textures and visuals
     std::vector<PatchData>   patches;
     std::vector<std::string> patch_names;   // PNAMES
     std::vector<TextureDef>  texture_defs;  // TEXTURE1/TEXTURE2
