@@ -449,7 +449,6 @@ void WAD::processWAD() {
     }
 
     if (isLevelMarker(lumpName)) {
-      std::cout << "WAD :: Found level marker: " << lumpName << "\n";
       Level level;
       level.name         = lumpName;
       level.texture_defs = allTextures;
@@ -461,35 +460,31 @@ void WAD::processWAD() {
       uint32_t vOffset, vSize;
       if (findLump("VERTEXES", vOffset, vSize, i + 1)) {
         level.vertices = readVertices(vOffset, vSize);
-        std::cout << "WAD :: Level " << lumpName << ": Loaded "
-                  << level.vertices.size() << " vertices\n";
       }
 
       uint32_t lOffset, lSize;
       if (findLump("LINEDEFS", lOffset, lSize, i + 1)) {
         level.linedefs = readLinedefs(lOffset, lSize);
-        std::cout << "WAD :: Level " << lumpName << ": Loaded "
-                  << level.linedefs.size() << " linedefs\n";
       }
 
       uint32_t sOffset, sSize;
       if (findLump("SIDEDEFS", sOffset, sSize, i + 1)) {
         level.sidedefs = readSidedefs(sOffset, sSize);
-        std::cout << "WAD :: Level " << lumpName << ": Loaded "
-                  << level.sidedefs.size() << " sidedefs\n";
       }
 
       uint32_t secOffset, secSize;
       if (findLump("SECTORS", secOffset, secSize, i + 1)) {
         level.sectors = readSectors(secOffset, secSize);
-        std::cout << "WAD :: Level " << lumpName << ": Loaded "
-                  << level.sectors.size() << " sectors\n";
       }
 
       if (!level.vertices.empty() && !level.linedefs.empty() &&
           !level.sidedefs.empty() && !level.sectors.empty()) {
         levels_.push_back(level);
-        std::cout << "WAD :: Added level: " << lumpName << "\n";
+        std::cout << "WAD :: Level " << lumpName
+                  << ": vertices=" << level.vertices.size()
+                  << " linedefs=" << level.linedefs.size()
+                  << " sidedefs=" << level.sidedefs.size()
+                  << " sectors=" << level.sectors.size() << "\n";
       }
     }
   }
@@ -497,10 +492,15 @@ void WAD::processWAD() {
   if (levels_.empty()) {
     std::cout << "WAD :: No valid levels found in WAD file\n";
   } else {
-    std::cout << "WAD :: Loaded " << levels_.size() << " levels:\n";
-    for (const Level &level : levels_) {
-      std::cout << "- " << level.name << "\n";
+    std::string levelList;
+    for (size_t i = 0; i < levels_.size(); ++i) {
+      levelList += levels_[i].name;
+      if (i < levels_.size() - 1) {
+        levelList += ", ";
+      }
     }
+    std::cout << "WAD :: Loaded " << levels_.size() << " levels: " << levelList
+              << "\n";
   }
 }
 
@@ -784,7 +784,7 @@ std::string WAD::toJSON() const {
  * @throws std::runtime_error if the level is not found
  */
 WAD::Level WAD::getLevel(std::string name) const {
-  std::cout << "WAD :: Looking for level: '" << name << "'\n";
+  std::cout << "WAD :: Looking for level: '" << name << "'...";
 
   // Trim input name from both ends
   while (!name.empty() && (name.front() == ' ' || name.front() == '\0')) {
@@ -806,10 +806,8 @@ WAD::Level WAD::getLevel(std::string name) const {
       levelName.pop_back();
     }
 
-    std::cout << "WAD :: Comparing '" << name << "' with '" << levelName
-              << "'\n";
     if (levelName == name) {
-      std::cout << "WAD :: Found level!\n";
+      std::cout << " found!\n";
       return levels_[i];
     }
   }
