@@ -1,5 +1,7 @@
 #include "wad-converter.hpp"
+#include "../okinawa.cpp/src/handlers/textures.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
+#include "../okinawa.cpp/src/utils/strings.hpp"
 #include <cmath>
 #include <limits>
 
@@ -22,17 +24,20 @@ WADConverter::~WADConverter() {
  */
 std::vector<OkItem *>
 WADConverter::createLevelGeometry(const WAD::Level &level) {
+  std::vector<OkItem *> items;
+
   // Calculate level bounds
   float minX = std::numeric_limits<float>::max();
   float maxX = std::numeric_limits<float>::lowest();
   float minY = std::numeric_limits<float>::max();
   float maxY = std::numeric_limits<float>::lowest();
 
-  for (const auto &vertex : level.vertices) {
-    minX = std::min(minX, static_cast<float>(vertex.x));
-    maxX = std::max(maxX, static_cast<float>(vertex.x));
-    minY = std::min(minY, static_cast<float>(vertex.y));
-    maxY = std::max(maxY, static_cast<float>(vertex.y));
+  for (size_t i = 0; i < level.vertices.size(); ++i) {
+    const WAD::Vertex &vertex = level.vertices[i];
+    minX                      = std::min(minX, static_cast<float>(vertex.x));
+    maxX                      = std::max(maxX, static_cast<float>(vertex.x));
+    minY                      = std::min(minY, static_cast<float>(vertex.y));
+    maxY                      = std::max(maxY, static_cast<float>(vertex.y));
   }
 
   // Calculate center point and dimensions
@@ -54,41 +59,26 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
     OkLogger::error("No texture definitions found in level!");
     for (size_t i = 0; i < 5 && i < level.sidedefs.size(); i++) {
       const WAD::Sidedef &sidedef = level.sidedefs[i];
-      std::string         upper(sidedef.upper_texture, 8);
-      std::string         middle(sidedef.middle_texture, 8);
-      std::string         lower(sidedef.lower_texture, 8);
-      while (!upper.empty() && upper.back() == ' ')
-        upper.pop_back();
-      while (!middle.empty() && middle.back() == ' ')
-        middle.pop_back();
-      while (!lower.empty() && lower.back() == ' ')
-        lower.pop_back();
+      std::string upper = OkStrings::trimFixedString(sidedef.upper_texture, 8);
+      std::string middle =
+          OkStrings::trimFixedString(sidedef.middle_texture, 8);
+      std::string lower = OkStrings::trimFixedString(sidedef.lower_texture, 8);
       OkLogger::info("WADConverter :: Sidedef " + std::to_string(i) +
-                     " textures - Upper: '" + upper + "', Middle: '" + middle +
-                     "', Lower: '" + lower + "'");
+                     " textures: " + upper + ", " + middle + ", " + lower);
     }
   }
 
   // First, load all textures needed for this level
   for (const WAD::Sidedef &sidedef : level.sidedefs) {
     // Get texture names from sidedef (upper, middle, lower)
-    std::string upperTex(sidedef.upper_texture, 8);
-    std::string middleTex(sidedef.middle_texture, 8);
-    std::string lowerTex(sidedef.lower_texture, 8);
-
-    // Trim texture names
-    while (!upperTex.empty() && upperTex.back() == ' ')
-      upperTex.pop_back();
-    while (!middleTex.empty() && middleTex.back() == ' ')
-      middleTex.pop_back();
-    while (!lowerTex.empty() && lowerTex.back() == ' ')
-      lowerTex.pop_back();
+    std::string upperTex = OkStrings::trimFixedString(sidedef.upper_texture, 8);
+    std::string middleTex =
+        OkStrings::trimFixedString(sidedef.middle_texture, 8);
+    std::string lowerTex = OkStrings::trimFixedString(sidedef.lower_texture, 8);
 
     // Find corresponding texture definitions
     for (const WAD::TextureDef &texDef : level.texture_defs) {
-      std::string texName(texDef.name, 8);
-      while (!texName.empty() && texName.back() == ' ')
-        texName.pop_back();
+      std::string texName = OkStrings::trimFixedString(texDef.name, 8);
 
       if (!texName.empty() && (texName == upperTex || texName == middleTex ||
                                texName == lowerTex)) {
@@ -182,16 +172,12 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
       // Get texture name based on wall type
       std::string textureName;
       if (sector1.ceiling_height > sector2.ceiling_height) {
-        textureName = std::string(rightSide.upper_texture, 8);
+        textureName = OkStrings::trimFixedString(rightSide.upper_texture, 8);
       } else if (sector1.floor_height < sector2.floor_height) {
-        textureName = std::string(rightSide.lower_texture, 8);
+        textureName = OkStrings::trimFixedString(rightSide.lower_texture, 8);
       } else {
-        textureName = std::string(rightSide.middle_texture, 8);
+        textureName = OkStrings::trimFixedString(rightSide.middle_texture, 8);
       }
-
-      // Trim texture name
-      while (!textureName.empty() && textureName.back() == ' ')
-        textureName.pop_back();
 
       // Skip invalid/empty texture names
       if (textureName.empty() || textureName == "-") {
@@ -211,7 +197,6 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   }
 
   // Create items from geometry groups
-  std::vector<OkItem *> items;
   for (std::map<std::string, GeometryGroup>::iterator it =
            geometryGroups.begin();
        it != geometryGroups.end(); ++it) {
@@ -236,7 +221,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
     OkItem *item = new OkItem(itemName, vertexData, group.vertices.size(),
                               indexData, group.indices.size());
 
-    // Look up texture using consistent name
+    // Look up texture using the already trimmed name from the geometry group
     OkTexture *texture =
         OkTextureHandler::getInstance()->getTexture(group.textureName);
     if (texture) {
@@ -456,11 +441,7 @@ void WADConverter::createTextureFromDef(
     const WAD::TextureDef &texDef, const std::vector<WAD::PatchData> &patches,
     const std::vector<WAD::Color> &palette) {
 
-  // Get texture name and trim it
-  std::string texName(texDef.name, 8);  // Use fixed size to match WAD format
-  while (!texName.empty() && texName.back() == ' ') {
-    texName.pop_back();
-  }
+  std::string texName = OkStrings::trimFixedString(texDef.name, 8);
 
   // Check if texture already exists in handler
   if (OkTextureHandler::getInstance()->getTexture(texName)) {
@@ -524,7 +505,7 @@ void WADConverter::createTextureFromDef(
                    "), Valid patches: " + std::to_string(validPatchCount) +
                    "/" + std::to_string(texDef.patches.size()));
 
-    // Create texture using the dedicated creation method
+    // Create texture using the dedicated creation method with pre-trimmed name
     OkTextureHandler::getInstance()->createTextureFromRawData(
         texName, textureData.data(), texDef.width, texDef.height, 4);
   } else {

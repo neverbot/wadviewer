@@ -1,4 +1,5 @@
 #include "wad.hpp"
+#include "../okinawa.cpp/src/utils/strings.hpp"
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -64,18 +65,7 @@ void WAD::readDirectory() {
 }
 
 bool WAD::isLevelMarker(const std::string &name) const {
-  // Clean the name first
-  std::string cleanName;
-  for (size_t i = 0; i < name.length() && name[i] != '\0'; i++) {
-    if (name[i] >= 32 && name[i] <= 126) {  // Printable ASCII only
-      cleanName += name[i];
-    }
-  }
-
-  // Remove trailing spaces
-  while (!cleanName.empty() && cleanName.back() == ' ') {
-    cleanName.pop_back();
-  }
+  std::string cleanName = OkStrings::trim(name);
 
   // DOOM 1 level names are ExMy (x = episode, y = mission)
   if (cleanName.length() == 4 && cleanName[0] == 'E' && cleanName[2] == 'M' &&
@@ -103,9 +93,9 @@ bool WAD::isLevelMarker(const std::string &name) const {
  * @return true if the lump is found, false otherwise
  */
 bool WAD::findLump(const std::string &name, uint32_t &offset, uint32_t &size,
-                   size_t startIndex = 0) const {
+                   size_t startIndex) const {
   for (size_t i = startIndex; i < directory_.size(); i++) {
-    std::string lumpName(directory_[i].name, strnlen(directory_[i].name, 8));
+    std::string lumpName = OkStrings::trimFixedString(directory_[i].name, 8);
 
     // Stop searching for level data at next level marker
     if (name == "VERTEXES" || name == "LINEDEFS" || name == "SIDEDEFS" ||
@@ -289,8 +279,7 @@ std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
   // Read patch names (8 bytes each, zero-terminated)
   const char *name_data = reinterpret_cast<const char *>(data.data() + 4);
   for (uint32_t i = 0; i < num_patches; i++) {
-    names.push_back(
-        std::string(name_data + i * 8, strnlen(name_data + i * 8, 8)));
+    names.push_back(OkStrings::trimFixedString(name_data + i * 8, 8));
   }
 
   return names;
@@ -795,13 +784,12 @@ std::string WAD::toJSON() const {
     nlohmann::json jsi = nlohmann::json::array();
     for (size_t sideIndex = 0; sideIndex < level.sidedefs.size(); sideIndex++) {
       const Sidedef &s = level.sidedefs[sideIndex];
-      jsi.push_back(
-          {{"x", s.x_offset},
-           {"y", s.y_offset},
-           {"u", std::string(s.upper_texture, strnlen(s.upper_texture, 8))},
-           {"l", std::string(s.lower_texture, strnlen(s.lower_texture, 8))},
-           {"m", std::string(s.middle_texture, strnlen(s.middle_texture, 8))},
-           {"s", s.sector}});
+      jsi.push_back({{"x", s.x_offset},
+                     {"y", s.y_offset},
+                     {"u", OkStrings::trimFixedString(s.upper_texture, 8)},
+                     {"l", OkStrings::trimFixedString(s.lower_texture, 8)},
+                     {"m", OkStrings::trimFixedString(s.middle_texture, 8)},
+                     {"s", s.sector}});
     }
     // levelJson["si"] = jsi;
     dumpArray("si", jsi);
@@ -811,14 +799,13 @@ std::string WAD::toJSON() const {
     nlohmann::json jse = nlohmann::json::array();
     for (size_t sectIndex = 0; sectIndex < level.sectors.size(); sectIndex++) {
       const Sector &s = level.sectors[sectIndex];
-      jse.push_back(
-          {{"f", s.floor_height},
-           {"c", s.ceiling_height},
-           {"t", std::string(s.floor_texture, strnlen(s.floor_texture, 8))},
-           {"x", std::string(s.ceiling_texture, strnlen(s.ceiling_texture, 8))},
-           {"l", s.light_level},
-           {"y", s.type},
-           {"g", s.tag}});
+      jse.push_back({{"f", s.floor_height},
+                     {"c", s.ceiling_height},
+                     {"t", OkStrings::trimFixedString(s.floor_texture, 8)},
+                     {"x", OkStrings::trimFixedString(s.ceiling_texture, 8)},
+                     {"l", s.light_level},
+                     {"y", s.type},
+                     {"g", s.tag}});
     }
     // levelJson["se"] = jse;
     dumpArray("se", jse);
@@ -860,26 +847,10 @@ std::string WAD::toJSON() const {
 WAD::Level WAD::getLevel(std::string name) const {
   std::cout << "WAD :: Looking for level: '" << name << "'...";
 
-  // Trim input name from both ends
-  while (!name.empty() && (name.front() == ' ' || name.front() == '\0')) {
-    name.erase(0, 1);
-  }
-  while (!name.empty() && (name.back() == ' ' || name.back() == '\0')) {
-    name.pop_back();
-  }
+  name = OkStrings::trim(name);
 
   for (size_t i = 0; i < levels_.size(); i++) {
-    std::string levelName = levels_[i].name;
-    // Trim stored level name from both ends
-    while (!levelName.empty() &&
-           (levelName.front() == ' ' || levelName.front() == '\0')) {
-      levelName.erase(0, 1);
-    }
-    while (!levelName.empty() &&
-           (levelName.back() == ' ' || levelName.back() == '\0')) {
-      levelName.pop_back();
-    }
-
+    std::string levelName = OkStrings::trim(levels_[i].name);
     if (levelName == name) {
       std::cout << " found!\n";
       return levels_[i];
