@@ -61,27 +61,6 @@ void WAD::readDirectory() {
   // (16 bytes), and we read all of them at once.
   file.read(reinterpret_cast<char *>(directory_.data()),
             header_.numlumps * sizeof(Directory));
-
-  // Debug first few entries to verify data
-  std::cout << "WAD :: Directory entries:\n";
-  for (size_t i = 0; i < 20 && i < directory_.size(); i++) {
-    std::string entryName(directory_[i].name, 8);
-    std::cout << "Entry " << i << " raw bytes: ";
-    for (int j = 0; j < 8; j++) {
-      unsigned char c = directory_[i].name[j];
-      std::cout << (int)c << " ";
-    }
-    std::cout << "  ASCII: '";
-    for (int j = 0; j < 8; j++) {
-      char c = directory_[i].name[j];
-      if (c >= 32 && c <= 126) {
-        std::cout << c;
-      } else {
-        std::cout << ".";
-      }
-    }
-    std::cout << "'\n";
-  }
 }
 
 bool WAD::isLevelMarker(const std::string &name) const {
@@ -401,28 +380,18 @@ void WAD::processWAD() {
   std::vector<PatchData>  allPatches;
   std::vector<Color>      palette;
 
-  // Count total lumps and show first few entries
+  // Count total lumps
   size_t totalLumps = directory_.size();
-  std::cout << "WAD :: Directory start:\n";
+
   for (size_t i = 0; i < 10; i++) {
     std::string rawName(directory_[i].name, 8);
-    std::cout << "Raw entry [" << i << "]: '";
-    for (int j = 0; j < 8; j++) {
-      char c = directory_[i].name[j];
-      if (c >= 32 && c <= 126) {
-        std::cout << c;
-      } else {
-        std::cout << "[" << (int)c << "]";
-      }
-    }
-    std::cout << "'\n";
 
     // Also show trimmed version
     while (!rawName.empty() && rawName.back() == ' ') {
       rawName.pop_back();
     }
-    std::cout << "Trimmed: '" << rawName << "'\n";
   }
+
   std::cout << "WAD :: Total lumps: " << totalLumps << "\n";
 
   // First load PLAYPAL (needed for texture conversion)
@@ -474,21 +443,11 @@ void WAD::processWAD() {
   // Now process levels (using the loaded textures/patches)
   for (size_t i = 0; i < directory_.size(); i++) {
     std::string lumpName(directory_[i].name, 8);
-    std::cout << "Raw lump name [" << i << "]: ";
-    for (int j = 0; j < 8; j++) {
-      if (directory_[i].name[j] >= 32 && directory_[i].name[j] <= 126) {
-        std::cout << directory_[i].name[j];
-      } else {
-        std::cout << "[" << (int)directory_[i].name[j] << "]";
-      }
-    }
-    std::cout << "\n";
 
     while (!lumpName.empty() && lumpName.back() == ' ') {
       lumpName.pop_back();
     }
 
-    std::cout << "WAD :: Checking lump: '" << lumpName << "'\n";
     if (isLevelMarker(lumpName)) {
       std::cout << "WAD :: Found level marker: " << lumpName << "\n";
       Level level;
