@@ -199,8 +199,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  OkItem *levelItem = nullptr;
-
   try {
     WAD wad(contentFile);  // Verbose mode
     wad.processWAD();
@@ -215,13 +213,16 @@ int main(int argc, char *argv[]) {
     OkLogger::info("Level name: " + level.name);
 
     // Create level geometry using the renderer
-    WADRenderer renderer;
-    levelItem = renderer.createLevelGeometry(level);
-    levelItem->setWireframe(false);
-    scene->addItem(levelItem);
+    WADRenderer           renderer;
+    std::vector<OkItem *> levelItems = renderer.createLevelGeometry(level);
+
+    for (size_t i = 0; i < levelItems.size(); ++i) {
+      levelItems[i]->setWireframe(false);
+      scene->addItem(levelItems[i]);
+    }
 
     // Position camera to view the level
-    positionCameraForItem(camera, levelItem);
+    positionCameraForItem(camera, levelItems[0]);
 
     // Add coordinate axes for reference
     float              axisLength = 100.0f;

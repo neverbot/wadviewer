@@ -109,6 +109,10 @@ public:
     std::vector<PatchInTexture> patches;
   };
 
+  struct Color {
+    uint8_t r, g, b;
+  };
+
   struct Level {
     std::string              name;
     std::vector<Vertex>      vertices;
@@ -119,6 +123,7 @@ public:
     std::vector<PatchData>   patches;
     std::vector<std::string> patch_names;   // PNAMES
     std::vector<TextureDef>  texture_defs;  // TEXTURE1/TEXTURE2
+    std::vector<Color>       palette;       // PLAYPAL lump (256 colors)
   };
 
   // Process and load all WAD data
@@ -138,6 +143,7 @@ private:
   std::string            filepath_;
   Header                 header_;
   std::vector<Directory> directory_;
+  std::vector<PatchData> patches_;
 
   // List of levels in the WAD file
   std::vector<Level> levels_;
@@ -166,4 +172,5 @@ private:
                                            std::size_t    size);
   PatchData                readPatch(std::streamoff offset, std::size_t size,
                                      const std::string &name);
+  std::vector<Color>       readPalette(std::streamoff offset, std::size_t size);
 };

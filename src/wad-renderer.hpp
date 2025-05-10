@@ -11,7 +11,7 @@ public:
   WADRenderer();
   ~WADRenderer();
 
-  OkItem *createLevelGeometry(const WAD::Level &level);
+  std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
 
 private:
   void createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
@@ -20,10 +20,11 @@ private:
                       std::vector<unsigned int> &indices);
 
   void createTextureFromDef(const WAD::TextureDef             &texDef,
-                            const std::vector<WAD::PatchData> &patches);
+                            const std::vector<WAD::PatchData> &patches,
+                            const std::vector<WAD::Color>     &palette);
   void compositePatch(std::vector<unsigned char> &textureData, int texWidth,
                       int texHeight, const WAD::PatchData &patch, int originX,
-                      int originY);
+                      int originY, const std::vector<WAD::Color> &palette);
 
   static float       centerX;
   static float       centerY;
