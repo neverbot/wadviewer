@@ -541,13 +541,15 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
                                   const std::vector<WAD::Color> &palette) {
   // Validate patch data
   if (patch.pixels.empty() || patch.width <= 0 || patch.height <= 0) {
-    OkLogger::error("Invalid patch data for patch " + patch.name);
+    OkLogger::error("Invalid patch data for patch " +
+                    std::string(patch.name, strnlen(patch.name, 8)));
     return;
   }
 
   // Validate texture data size
   if (textureData.size() < (size_t)(texWidth * texHeight * 4)) {
-    OkLogger::error("Invalid texture data size for patch " + patch.name);
+    OkLogger::error("Invalid texture data size for patch " +
+                    std::string(patch.name, strnlen(patch.name, 8)));
     return;
   }
 
@@ -567,14 +569,15 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
       // Calculate source and destination indices with bounds checking
       int srcIndex = y * patch.width + x;
       if (srcIndex >= (int)patch.pixels.size()) {
-        OkLogger::error("Source index out of bounds in patch " + patch.name);
+        OkLogger::error("Source index out of bounds in patch " +
+                        std::string(patch.name, strnlen(patch.name, 8)));
         continue;
       }
 
       int destIndex = (destY * texWidth + destX) * 4;  // RGBA format
       if (destIndex + 3 >= (int)textureData.size()) {
         OkLogger::error("Destination index out of bounds in patch " +
-                        patch.name);
+                        std::string(patch.name, strnlen(patch.name, 8)));
         continue;
       }
 

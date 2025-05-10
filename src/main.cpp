@@ -273,7 +273,8 @@ int main(int argc, char *argv[]) {
     }
 
     WAD::Level level = wad.getLevel(levelName);
-    OkLogger::info("Level name: " + level.name);
+    OkLogger::info("Level name: " +
+                   std::string(level.name, strnlen(level.name, 8)));
 
     // Create level geometry using the converter
     WADConverter          converter;
