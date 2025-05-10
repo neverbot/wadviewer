@@ -111,6 +111,69 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
 }
 
 /**
+ * @brief Position the camera to view the level geometry.
+ * @param camera The camera to position.
+ * @param items Vector of level items.
+ */
+void positionCameraForLevel(OkCamera                    *camera,
+                            const std::vector<OkItem *> &items) {
+  // Find level bounds
+  float minX = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float minY = std::numeric_limits<float>::max();
+  float maxY = std::numeric_limits<float>::lowest();
+  float minZ = std::numeric_limits<float>::max();
+  float maxZ = std::numeric_limits<float>::lowest();
+
+  for (size_t i = 0; i < items.size(); ++i) {
+    float   radius = items[i]->getRadius();
+    OkPoint pos    = items[i]->getPosition();
+    minX           = std::min(minX, pos.x() - radius);
+    maxX           = std::max(maxX, pos.x() + radius);
+    minY           = std::min(minY, pos.y() - radius);
+    maxY           = std::max(maxY, pos.y() + radius);
+    minZ           = std::min(minZ, pos.z() - radius);
+    maxZ           = std::max(maxZ, pos.z() + radius);
+  }
+
+  // Calculate level dimensions
+  float width       = maxX - minX;
+  float height      = maxY - minY;
+  float depth       = maxZ - minZ;
+  float levelRadius = sqrt(width * width + depth * depth) * 0.5f;
+
+  // Position camera to see the whole level
+  float distance     = levelRadius;  // * 2.0f;
+  float cameraHeight = maxY + levelRadius * 0.1f;
+
+  // Position camera above and behind the level center
+  float   centerX = (minX + maxX) * 0.5f;
+  float   centerZ = (minZ + maxZ) * 0.5f;
+  OkPoint cameraPos(centerX, cameraHeight, centerZ + distance);
+  camera->setPosition(cameraPos);
+
+  // Look at level center
+  OkPoint targetPos(centerX, (minY + maxY) * 0.5f, centerZ);
+  OkPoint direction = targetPos - cameraPos;
+
+  float pitch, yaw;
+  OkMath::directionVectorToAngles(direction.normalize(), pitch, yaw);
+  camera->setRotation(pitch, yaw, 0.0f);
+
+  // Set up perspective to view entire level
+  float fov       = 45.0f;
+  float nearPlane = 0.1f;
+  float farPlane  = distance * 4.0f;  // Make sure we can see the whole level
+  camera->setPerspective(fov, nearPlane, farPlane);
+
+  OkLogger::info("Level bounds: (" + std::to_string(minX) + "," +
+                 std::to_string(minY) + "," + std::to_string(minZ) + ") to (" +
+                 std::to_string(maxX) + "," + std::to_string(maxY) + "," +
+                 std::to_string(maxZ) + ")");
+  OkLogger::info("Camera positioned at: " + cameraPos.toString());
+}
+
+/**
  * @brief Main function for the WAD viewer application.
  * @param argc Number of command line arguments.
  * @param argv Command line arguments.
@@ -221,8 +284,8 @@ int main(int argc, char *argv[]) {
       scene->addItem(levelItems[i]);
     }
 
-    // Position camera to view the level
-    positionCameraForItem(camera, levelItems[0]);
+    // Position camera to view the entire level
+    positionCameraForLevel(camera, levelItems);
 
     // Add coordinate axes for reference
     float              axisLength = 100.0f;

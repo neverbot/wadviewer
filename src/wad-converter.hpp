@@ -2,7 +2,8 @@
 #define WAD_CONVERTER_HPP
 
 #include "../okinawa.cpp/src/item/item.hpp"
-#include "wad.hpp"
+#include "./wad.hpp"
+#include <vector>
 
 class WADConverter {
 public:
@@ -15,6 +16,19 @@ private:
   static float       centerX;
   static float       centerY;
   static const float SCALE;
+
+  void createWallSection(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
+                         float bottomHeight, float topHeight,
+                         const WAD::Sidedef        &sidedef,
+                         std::vector<float>        &vertices,
+                         std::vector<unsigned int> &indices);
+
+  void createSectorGeometry(const WAD::Level &level,
+                            const WAD::Sector &sector,
+                            const std::vector<size_t> &sectorVertices,
+                            std::vector<float> &vertices,
+                            std::vector<unsigned int> &indices,
+                            bool isFloor);
 
   void createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
                       const WAD::Sector &sector1, const WAD::Sector &sector2,
