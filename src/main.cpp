@@ -27,44 +27,52 @@ enum class Format {
  * @param deltaTime Time since the last frame in milliseconds.
  */
 void stepCallback(float deltaTime) {
-  float timeInSeconds = deltaTime / 1000.0f;
-
   OkInput     *input  = OkCore::getInput();
   OkInputState state  = input->getState();
   OkCamera    *camera = OkCore::getCamera();
 
-  float velocity = camera->getSpeedMagnitude() * timeInSeconds;
+  OkPoint forward = camera->getRotation().getForwardVector();
+  OkPoint right   = camera->getRotation().getRightVector();
+  OkPoint direction(0.0f, 0.0f, 0.0f);
 
-  OkPoint position = camera->getPosition();
-  OkPoint forward  = camera->getRotation().getForwardVector();
-  OkPoint right    = camera->getRotation().getRightVector();
-  OkPoint up       = camera->getRotation().getUpVector();
-
-  // Forward/Backward movement along forward vector
+  // Calculate movement direction based on input
   if (state.forward) {
-    position = position + (forward * velocity);
+    direction = direction + forward;
   }
   if (state.backward) {
-    position = position - (forward * velocity);
+    direction = direction - forward;
   }
-
-  // Left/Right movement along right vector
   if (state.strafeLeft) {
-    position = position - (right * velocity);
+    direction = direction - right;
   }
   if (state.strafeRight) {
-    position = position + (right * velocity);
+    direction = direction + right;
   }
 
-  // Update camera position
-  camera->setPosition(position);
+  // Base movement speed (units per second)
+  const float baseSpeed = 50.0f;
 
-  // Debug logging
+  // Apply movement speed if there's input
+  if (direction.x() != 0 || direction.y() != 0 || direction.z() != 0) {
+    float magnitude =
+        sqrt(direction.x() * direction.x() + direction.y() * direction.y() +
+             direction.z() * direction.z());
+
+    if (magnitude > 0.0001f) {  // Small epsilon to avoid floating point errors
+      direction = direction.normalize() * baseSpeed;
+    } else {
+      direction = OkPoint(0.0f, 0.0f, 0.0f);
+    }
+  }
+
+  // Set the camera's speed - this will be applied in OkObject::step
+  camera->setSpeed(direction.x(), direction.y(), direction.z());
+
+  // Log only once per second for debugging
   static int frameCount = 0;
-  if (frameCount++ % 60 == 0) {
-    OkLogger::info("Camera pos: " + std::to_string(position.x()) + ", " +
-                   std::to_string(position.y()) + ", " +
-                   std::to_string(position.z()));
+  if (frameCount++ % 60 == 0) {  // Assuming 60 FPS, adjust if different
+    OkPoint position = camera->getPosition();
+    OkLogger::info("Camera pos: " + position.toString());
   }
 }
 
@@ -183,8 +191,6 @@ int main(int argc, char *argv[]) {
   OkLogger::info("Main :: Starting up...");
   OkCore::initialize();
 
-  const float cameraSpeed = 200.0f;  // Increased from 40.0f to 200.0f
-
   // Set initial camera
   OkCamera  *camera = OkCore::getCamera();
   OkPoint    position(0.0f, 100.0f, 200.0f);  // Lower height, moved back
@@ -192,8 +198,10 @@ int main(int argc, char *argv[]) {
   float      yaw   = 0.0f;                    // Looking towards -Z
   OkRotation rotation(pitch, yaw, 0.0f);
 
-  camera->setSpeed(cameraSpeed, cameraSpeed,
-                   cameraSpeed);  // Set speed in all directions
+  // Set maximum velocity (don't set speed directly)
+  const float cameraSpeed = 10.0f;  // Units per second
+  camera->setMaxVelocity(cameraSpeed);
+
   // Not needed, will be set in positionCameraForItem
   // camera->setPosition(position);
   // camera->setRotation(rotation);
@@ -286,11 +294,11 @@ int main(int argc, char *argv[]) {
                                          OkConfig::getInt("window.height"));
 
     OkCore::addCamera(povCamera);
-    povCamera->setSpeed(cameraSpeed, cameraSpeed,
-                        cameraSpeed);  // Set speed in all directions
+    // Slower speed for POV camera
+    povCamera->setMaxVelocity(cameraSpeed * 0.5f);
     povCamera->setPosition(*playerStart);
     povCamera->setRotation(0.0f, 0.0f, 0.0f);
-    povCamera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
+    povCamera->setPerspective(45.0f, 0.1f, 2000.0f);
 
     for (size_t i = 0; i < levelItems.size(); ++i) {
       levelItems[i]->setWireframe(false);
