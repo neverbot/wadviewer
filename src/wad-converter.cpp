@@ -7,7 +7,8 @@
 
 float       WADConverter::centerX = 0.0f;
 float       WADConverter::centerY = 0.0f;
-const float WADConverter::SCALE   = 1.0f;
+const float WADConverter::SCALE =
+    1.0f;  // Scale down the geometry to make it more manageable
 
 WADConverter::WADConverter() {
   // Empty constructor
@@ -266,11 +267,11 @@ void WADConverter::createWallFace(const WAD::Vertex         &vertex1,
   float x2 = (static_cast<float>(vertex2.x) - centerX) * SCALE;
   float z2 = (static_cast<float>(vertex2.y) - centerY) * SCALE;
 
-  // Get ceiling and floor heights for both sectors
-  float floor1 = static_cast<float>(sector1.floor_height);
-  float ceil1  = static_cast<float>(sector1.ceiling_height);
-  float floor2 = static_cast<float>(sector2.floor_height);
-  float ceil2  = static_cast<float>(sector2.ceiling_height);
+  // Get ceiling and floor heights, applying the same scale
+  float floor1 = static_cast<float>(sector1.floor_height) * SCALE;
+  float ceil1  = static_cast<float>(sector1.ceiling_height) * SCALE;
+  float floor2 = static_cast<float>(sector2.floor_height) * SCALE;
+  float ceil2  = static_cast<float>(sector2.ceiling_height) * SCALE;
 
   // Calculate wall height and length for texture mapping
   float wallBottom, wallTop;
@@ -310,8 +311,8 @@ void WADConverter::createWallFace(const WAD::Vertex         &vertex1,
   float u1 = uOffset / TEXTURE_WIDTH;
   float u2 = u1 + (wallLength / TEXTURE_WIDTH);  // Texture repeats along length
   float v1 = vOffset / TEXTURE_HEIGHT;
-  float v2 =
-      v1 + (wallHeight / TEXTURE_HEIGHT);  // Texture repeats along height
+  float v2 = v1 + (wallHeight /
+                   (TEXTURE_HEIGHT * SCALE));  // Scale height for texturing
 
   // Add vertices for the wall quad with proper texture coordinates
   // Bottom left
