@@ -1,17 +1,17 @@
-#include "wad-renderer.hpp"
+#include "wad-converter.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include <cmath>
 #include <limits>
 
-float       WADRenderer::centerX = 0.0f;
-float       WADRenderer::centerY = 0.0f;
-const float WADRenderer::SCALE   = 1.0f;
+float       WADConverter::centerX = 0.0f;
+float       WADConverter::centerY = 0.0f;
+const float WADConverter::SCALE   = 1.0f;
 
-WADRenderer::WADRenderer() {
+WADConverter::WADConverter() {
   // Empty constructor
 }
 
-WADRenderer::~WADRenderer() {
+WADConverter::~WADConverter() {
   // Nothing to clean up - TextureHandler handles texture cleanup
 }
 
@@ -21,7 +21,7 @@ WADRenderer::~WADRenderer() {
  * @return A vector of OkItem pointers representing the level geometry.
  */
 std::vector<OkItem *>
-WADRenderer::createLevelGeometry(const WAD::Level &level) {
+WADConverter::createLevelGeometry(const WAD::Level &level) {
   // Calculate level bounds
   float minX = std::numeric_limits<float>::max();
   float maxX = std::numeric_limits<float>::lowest();
@@ -45,7 +45,7 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
   float maxDimension = std::max(width, height);
 
   // Log texture and level info in single lines
-  OkLogger::info("WADRenderer :: Level info - Textures: " +
+  OkLogger::info("WADConverter :: Level info - Textures: " +
                  std::to_string(level.texture_defs.size()) +
                  ", Patches: " + std::to_string(level.patches.size()) +
                  ", Colors: " + std::to_string(level.palette.size()));
@@ -63,7 +63,7 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
         middle.pop_back();
       while (!lower.empty() && lower.back() == ' ')
         lower.pop_back();
-      OkLogger::info("WADRenderer :: Sidedef " + std::to_string(i) +
+      OkLogger::info("WADConverter :: Sidedef " + std::to_string(i) +
                      " textures - Upper: '" + upper + "', Middle: '" + middle +
                      "', Lower: '" + lower + "'");
     }
@@ -106,7 +106,7 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
   std::map<std::string, GeometryGroup> geometryGroups;
 
   // Log level stats before processing
-  OkLogger::info("WADRenderer :: Level '" + level.name +
+  OkLogger::info("WADConverter :: Level '" + level.name +
                  "' - Vertices: " + std::to_string(level.vertices.size()) +
                  ", Linedefs: " + std::to_string(level.linedefs.size()) +
                  ", Sectors: " + std::to_string(level.sectors.size()));
@@ -241,13 +241,17 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
                               indexData,              // unsigned int* indexData
                               group.indices.size());  // long indexCount
 
-    // Get texture from texture handler
+    // Get texture from texture handler - just look it up since it should
+    // already exist
     OkTexture *texture =
         OkTextureHandler::getInstance()->getTexture(group.textureName);
     if (texture) {
       item->setTexture(group.textureName, texture);
       OkLogger::info("Assigned texture '" + group.textureName + "' to item '" +
                      itemName + "'");
+    } else {
+      OkLogger::error("Could not find texture '" + group.textureName +
+                      "' for item '" + itemName + "'");
     }
 
     items.push_back(item);
@@ -270,13 +274,13 @@ WADRenderer::createLevelGeometry(const WAD::Level &level) {
  * @param vertices Output vertex data
  * @param indices Output index data
  */
-void WADRenderer::createWallFace(const WAD::Vertex         &vertex1,
-                                 const WAD::Vertex         &vertex2,
-                                 const WAD::Sector         &sector1,
-                                 const WAD::Sector         &sector2,
-                                 const WAD::Sidedef        &sidedef,
-                                 std::vector<float>        &vertices,
-                                 std::vector<unsigned int> &indices) {
+void WADConverter::createWallFace(const WAD::Vertex         &vertex1,
+                                  const WAD::Vertex         &vertex2,
+                                  const WAD::Sector         &sector1,
+                                  const WAD::Sector         &sector2,
+                                  const WAD::Sidedef        &sidedef,
+                                  std::vector<float>        &vertices,
+                                  std::vector<unsigned int> &indices) {
   // Calculate normalized positions
   float x1 = (static_cast<float>(vertex1.x) - centerX) * SCALE;
   float z1 = (static_cast<float>(vertex1.y) - centerY) * SCALE;
@@ -379,11 +383,11 @@ void WADRenderer::createWallFace(const WAD::Vertex         &vertex1,
  * @param originY The Y origin for the patch.
  * @param palette The color palette to use for the patch.
  */
-void WADRenderer::compositePatch(std::vector<unsigned char> &textureData,
-                                 int texWidth, int texHeight,
-                                 const WAD::PatchData &patch, int originX,
-                                 int                            originY,
-                                 const std::vector<WAD::Color> &palette) {
+void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
+                                  int texWidth, int texHeight,
+                                  const WAD::PatchData &patch, int originX,
+                                  int                            originY,
+                                  const std::vector<WAD::Color> &palette) {
   // Validate patch data
   if (patch.pixels.empty() || patch.width <= 0 || patch.height <= 0) {
     OkLogger::error("Invalid patch data for patch " + patch.name);
@@ -454,7 +458,7 @@ void WADRenderer::compositePatch(std::vector<unsigned char> &textureData,
  * @param texDef The texture definition containing patch information.
  * @param patches The vector of patch data.
  */
-void WADRenderer::createTextureFromDef(
+void WADConverter::createTextureFromDef(
     const WAD::TextureDef &texDef, const std::vector<WAD::PatchData> &patches,
     const std::vector<WAD::Color> &palette) {
 
@@ -466,15 +470,10 @@ void WADRenderer::createTextureFromDef(
 
   // Check if texture already exists in handler
   if (OkTextureHandler::getInstance()->getTexture(texName)) {
-    // OkLogger::info("WADRenderer :: Texture '" + texName +
+    // OkLogger::info("WADConverter :: Texture '" + texName +
     //                "' already exists, skipping creation");
     return;
   }
-
-  OkLogger::info("WADRenderer :: Creating texture '" + texName +
-                 "' - Size: " + std::to_string(texDef.width) + "x" +
-                 std::to_string(texDef.height) +
-                 ", Patches: " + std::to_string(texDef.patches.size()));
 
   // Basic validation
   if (texDef.width <= 0 || texDef.height <= 0 || texDef.patches.empty() ||
@@ -519,7 +518,12 @@ void WADRenderer::createTextureFromDef(
     }
   }
 
-  // Create texture in handler
-  OkTextureHandler::getInstance()->getTextureFromRawData(
+  OkLogger::info("WADConverter :: Creating texture '" + texName +
+                 "' - Size: " + std::to_string(texDef.width) + "x" +
+                 std::to_string(texDef.height) +
+                 ", Patches: " + std::to_string(texDef.patches.size()));
+
+  // Create texture using the dedicated creation method
+  OkTextureHandler::getInstance()->createTextureFromRawData(
       texName, textureData.data(), texDef.width, texDef.height, 4);
 }

@@ -10,7 +10,7 @@
 #include <iostream>
 #include <map>
 
-#include "./wad-renderer.hpp"
+#include "./wad-converter.hpp"
 #include "./wad.hpp"
 
 // enum with the possible formats for the file to view
@@ -212,9 +212,9 @@ int main(int argc, char *argv[]) {
     WAD::Level level = wad.getLevel(levelName);
     OkLogger::info("Level name: " + level.name);
 
-    // Create level geometry using the renderer
-    WADRenderer           renderer;
-    std::vector<OkItem *> levelItems = renderer.createLevelGeometry(level);
+    // Create level geometry using the converter
+    WADConverter          converter;
+    std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
 
     for (size_t i = 0; i < levelItems.size(); ++i) {
       levelItems[i]->setWireframe(false);

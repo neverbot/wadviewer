@@ -6,10 +6,10 @@
 #include "./wad.hpp"
 #include <string>
 
-class WADRenderer {
+class WADConverter {
 public:
-  WADRenderer();
-  ~WADRenderer();
+  WADConverter();
+  ~WADConverter();
 
   std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
 
