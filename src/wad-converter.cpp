@@ -121,7 +121,12 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   centerX = (minX + maxX) / 2.0f;
   centerY = (minY + maxY) / 2.0f;
 
-  // First, load all textures we'll need
+  // First, create all flat (floor/ceiling) textures
+  for (const WAD::FlatData &flat : level.flats) {
+    createFlatTexture(flat.name, flat, level.palette);
+  }
+
+  // Then load all wall textures we'll need
   for (const WAD::Sidedef &sidedef : level.sidedefs) {
     std::string upperTex = OkStrings::trimFixedString(sidedef.upper_texture, 8);
     std::string middleTex =
