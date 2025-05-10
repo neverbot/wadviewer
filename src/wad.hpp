@@ -85,10 +85,10 @@ public:
   };
 
   struct PatchData {
-    std::string          name;    // Name from PNAMES
-    uint16_t             width;   // Width of the patch
-    uint16_t             height;  // Height of the patch
-    std::vector<uint8_t> pixels;  // Pixel data (width * height)
+    char                 name[8];  // name from PNAMES
+    uint16_t             width;    // Width of the patch
+    uint16_t             height;   // Height of the patch
+    std::vector<uint8_t> pixels;   // Pixel data (width * height)
   };
 
   // Patch definition in a texture
@@ -116,12 +116,12 @@ public:
   };
 
   struct FlatData {
-    std::string          name;
+    char                 name[8];
     std::vector<uint8_t> data;  // Raw flat data (64x64 pixels)
   };
 
   struct Level {
-    std::string              name;
+    char                     name[8];
     std::vector<Vertex>      vertices;
     std::vector<Linedef>     linedefs;
     std::vector<Sidedef>     sidedefs;

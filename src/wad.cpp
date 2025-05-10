@@ -216,7 +216,7 @@ WAD::PatchData WAD::readPatch(std::streamoff offset, std::size_t size,
                               const std::string &name) {
   auto      data = readLump(offset, size);
   PatchData patch;
-  patch.name = name;
+  std::strncpy(patch.name, name.c_str(), 8);  // Copy name to char array
 
   // Read patch header
   const PatchHeader *header =
@@ -536,7 +536,7 @@ void WAD::processWAD() {
 
     if (isLevelMarker(lumpName)) {
       Level level;
-      level.name         = lumpName;
+      std::strncpy(level.name, lumpName.c_str(), 8);
       level.texture_defs = allTextures;
       level.patches      = allPatches;
       level.patch_names  = patchNames;
@@ -584,7 +584,7 @@ void WAD::processWAD() {
           std::vector<uint8_t> flatData = readLump(offset, size);
           if (flatData.size() == 64 * 64) {  // DOOM flats are always 64x64
             FlatData flat;
-            flat.name = *it;
+            std::strncpy(flat.name, it->c_str(), 8);
             flat.data = flatData;
             level.flats.push_back(flat);
           }
@@ -876,9 +876,9 @@ std::string WAD::toJSON() const {
 WAD::Level WAD::getLevel(std::string name) const {
   std::cout << "WAD :: Looking for level: '" << name << "'...";
 
-  // Exact string comparison without extra trimming
+  // Compare the first 8 characters of the name
   for (size_t i = 0; i < levels_.size(); i++) {
-    if (levels_[i].name == name) {
+    if (strncmp(levels_[i].name, name.c_str(), 8) == 0) {
       std::cout << " found!\n";
       return levels_[i];
     }
@@ -895,7 +895,7 @@ WAD::Level WAD::getLevel(std::string name) const {
  */
 std::string WAD::getLevelNameByIndex(size_t index) const {
   if (index < levels_.size()) {
-    return levels_[index].name;
+    return std::string(levels_[index].name, strnlen(levels_[index].name, 8));
   } else {
     throw std::out_of_range("Index out of range");
   }
