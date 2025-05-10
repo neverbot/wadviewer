@@ -1,5 +1,5 @@
-#ifndef WAD_CONVERTER_HPP
-#define WAD_CONVERTER_HPP
+#ifndef WAD_VIEWER_WAD_CONVERTER_HPP
+#define WAD_VIEWER_WAD_CONVERTER_HPP
 
 #include "../okinawa.cpp/src/item/item.hpp"
 #include "./wad.hpp"
@@ -46,4 +46,4 @@ private:
                          const std::vector<WAD::Color> &palette);
 };
 
-#endif
+#endif  // WAD_VIEWER_WAD_CONVERTER_HPP

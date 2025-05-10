@@ -1,7 +1,8 @@
-#pragma once
+#ifndef WAD_VIEWER_WAD_HPP
+#define WAD_VIEWER_WAD_HPP
+
 #include <cstdint>
 #include <fstream>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -13,16 +14,16 @@ public:
 
   // WAD header structure
   struct Header {
-    char     identification[4];  // IWAD or PWAD
-    uint32_t numlumps;           // Number of lumps
-    uint32_t infotableofs;       // Offset to directory
+    std::string identification;  // IWAD or PWAD
+    uint32_t    numlumps;        // Number of lumps
+    uint32_t    infotableofs;    // Offset to directory
   };
 
   // Directory entry structure
   struct Directory {
-    uint32_t filepos;  // Offset to start of lump
-    uint32_t size;     // Size of lump
-    char     name[8];  // Lump name (zero-terminated)
+    uint32_t    filepos;  // Offset to start of lump
+    uint32_t    size;     // Size of lump
+    std::string name;     // Lump name
   };
 
   // Structure definitions
@@ -42,22 +43,22 @@ public:
   };
 
   struct Sidedef {
-    int16_t  x_offset;
-    int16_t  y_offset;
-    char     upper_texture[8];
-    char     lower_texture[8];
-    char     middle_texture[8];
-    uint16_t sector;
+    int16_t     x_offset;
+    int16_t     y_offset;
+    std::string upper_texture;
+    std::string lower_texture;
+    std::string middle_texture;
+    uint16_t    sector;
   };
 
   struct Sector {
-    int16_t  floor_height;
-    int16_t  ceiling_height;
-    char     floor_texture[8];
-    char     ceiling_texture[8];
-    uint16_t light_level;
-    uint16_t type;
-    uint16_t tag;
+    int16_t     floor_height;
+    int16_t     ceiling_height;
+    std::string floor_texture;
+    std::string ceiling_texture;
+    uint16_t    light_level;
+    uint16_t    type;
+    uint16_t    tag;
   };
 
   struct Thing {
@@ -101,7 +102,7 @@ public:
 
   // Texture definition
   struct TextureDef {
-    char                        name[8];      // Texture name
+    std::string                 name;         // Texture name
     uint32_t                    masked;       // Composite texture
     uint16_t                    width;        // Width of texture
     uint16_t                    height;       // Height of texture
@@ -181,3 +182,5 @@ private:
                                      const std::string &name);
   std::vector<Color>       readPalette(std::streamoff offset, std::size_t size);
 };
+
+#endif  // WAD_VIEWER_WAD_HPP
