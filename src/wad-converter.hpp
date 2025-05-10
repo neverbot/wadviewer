@@ -24,7 +24,7 @@ private:
                          std::vector<unsigned int> &indices);
 
   void createSectorGeometry(const WAD::Level &level, const WAD::Sector &sector,
-                            const std::vector<size_t> &sectorVertices,
+                            const std::vector<int>    &sectorVertices,
                             std::vector<float>        &vertices,
                             std::vector<unsigned int> &indices, bool isFloor);
 

@@ -110,7 +110,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   float minY = std::numeric_limits<float>::max();
   float maxY = std::numeric_limits<float>::lowest();
 
-  for (size_t i = 0; i < level.vertices.size(); ++i) {
+  for (int i = 0; i < (int)level.vertices.size(); i++) {
     const WAD::Vertex &vertex = level.vertices[i];
     minX                      = std::min(minX, static_cast<float>(vertex.x));
     maxX                      = std::max(maxX, static_cast<float>(vertex.x));
@@ -122,12 +122,14 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   centerY = (minY + maxY) / 2.0f;
 
   // First, create all flat (floor/ceiling) textures
-  for (const WAD::FlatData &flat : level.flats) {
+  for (int i = 0; i < (int)level.flats.size(); i++) {
+    const WAD::FlatData &flat = level.flats[i];
     createFlatTexture(flat.name, flat, level.palette);
   }
 
   // Then load all wall textures we'll need
-  for (const WAD::Sidedef &sidedef : level.sidedefs) {
+  for (int i = 0; i < (int)level.sidedefs.size(); i++) {
+    const WAD::Sidedef &sidedef = level.sidedefs[i];
     std::string upperTex = OkStrings::trimFixedString(sidedef.upper_texture, 8);
     std::string middleTex =
         OkStrings::trimFixedString(sidedef.middle_texture, 8);
@@ -142,7 +144,8 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
           OkStrings::trimFixedString(sector.ceiling_texture, 8);
 
       // Load all needed textures
-      for (const WAD::TextureDef &texDef : level.texture_defs) {
+      for (int j = 0; j < (int)level.texture_defs.size(); j++) {
+        const WAD::TextureDef &texDef = level.texture_defs[j];
         std::string texName = OkStrings::trimFixedString(texDef.name, 8);
         if (!texName.empty() && (texName == upperTex || texName == middleTex ||
                                  texName == lowerTex || texName == floorTex ||
@@ -154,7 +157,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   }
 
   // Track vertices for each sector
-  std::vector<std::vector<size_t>> sectorVertices(level.sectors.size());
+  std::vector<std::vector<int>> sectorVertices(level.sectors.size());
 
   // Structure to hold geometry for each texture
   struct GeometryGroup {
@@ -165,7 +168,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   std::map<std::string, GeometryGroup> geometryGroups;
 
   // First pass: collect vertices for each sector and create walls
-  for (size_t i = 0; i < level.linedefs.size(); i++) {
+  for (int i = 0; i < (int)level.linedefs.size(); i++) {
     const WAD::Linedef &linedef = level.linedefs[i];
 
     // Skip invalid vertex indices
@@ -266,7 +269,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   }
 
   // Second pass: create floor and ceiling geometry for each sector
-  for (size_t i = 0; i < level.sectors.size(); i++) {
+  for (int i = 0; i < (int)level.sectors.size(); i++) {
     const WAD::Sector &sector = level.sectors[i];
 
     // Remove duplicate vertices
@@ -299,7 +302,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   // Create OkItems from geometry groups
   for (std::map<std::string, GeometryGroup>::iterator it =
            geometryGroups.begin();
-       it != geometryGroups.end(); ++it) {
+       it != geometryGroups.end(); it++) {
     const GeometryGroup &group = it->second;
 
     if (group.vertices.empty() || group.indices.empty()) {
@@ -311,10 +314,10 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
     unsigned int *indexData  = new unsigned int[group.indices.size()];
 
     // Copy vertex and index data
-    for (size_t i = 0; i < group.vertices.size(); ++i) {
+    for (int i = 0; i < (int)group.vertices.size(); i++) {
       vertexData[i] = group.vertices[i];
     }
-    for (size_t i = 0; i < group.indices.size(); ++i) {
+    for (int i = 0; i < (int)group.indices.size(); i++) {
       indexData[i] = group.indices[i];
     }
 
@@ -338,10 +341,12 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   return items;
 }
 
-void WADConverter::createSectorGeometry(
-    const WAD::Level &level, const WAD::Sector &sector,
-    const std::vector<size_t> &sectorVertices, std::vector<float> &vertices,
-    std::vector<unsigned int> &indices, bool isFloor) {
+void WADConverter::createSectorGeometry(const WAD::Level       &level,
+                                        const WAD::Sector      &sector,
+                                        const std::vector<int> &sectorVertices,
+                                        std::vector<float>     &vertices,
+                                        std::vector<unsigned int> &indices,
+                                        bool                       isFloor) {
 
   if (sectorVertices.size() < 3) {
     return;  // Need at least 3 vertices to form a polygon
@@ -361,7 +366,7 @@ void WADConverter::createSectorGeometry(
   float maxY = std::numeric_limits<float>::lowest();
 
   // First pass - get bounds for texture coordinates
-  for (size_t i = 0; i < sectorVertices.size(); ++i) {
+  for (int i = 0; i < (int)sectorVertices.size(); i++) {
     const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
     float              worldX = static_cast<float>(vertex.x);
     float              worldY = static_cast<float>(vertex.y);
@@ -373,7 +378,7 @@ void WADConverter::createSectorGeometry(
   }
 
   // Create vertices with proper texture coordinates
-  for (size_t i = 0; i < sectorVertices.size(); ++i) {
+  for (int i = 0; i < (int)sectorVertices.size(); i++) {
     const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
     float              x = (static_cast<float>(vertex.x) - centerX) * SCALE;
     float              z = (static_cast<float>(vertex.y) - centerY) * SCALE;
@@ -394,7 +399,7 @@ void WADConverter::createSectorGeometry(
   }
 
   // Create triangles using a simple triangle fan
-  for (size_t i = 1; i < sectorVertices.size() - 1; ++i) {
+  for (int i = 1; i < (int)sectorVertices.size() - 1; i++) {
     if (isFloor) {
       // Floor - CCW winding
       indices.push_back(baseIndex);          // Center
@@ -560,14 +565,14 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
       }
 
       // Calculate source and destination indices with bounds checking
-      size_t srcIndex = (y * patch.width + x);
-      if (srcIndex >= patch.pixels.size() || srcIndex < 0) {
+      int srcIndex = y * patch.width + x;
+      if (srcIndex >= (int)patch.pixels.size()) {
         OkLogger::error("Source index out of bounds in patch " + patch.name);
         continue;
       }
 
-      size_t destIndex = ((size_t)destY * texWidth + destX) * 4;  // RGBA format
-      if (destIndex + 3 >= textureData.size()) {
+      int destIndex = (destY * texWidth + destX) * 4;  // RGBA format
+      if (destIndex + 3 >= (int)textureData.size()) {
         OkLogger::error("Destination index out of bounds in patch " +
                         patch.name);
         continue;
@@ -587,14 +592,6 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
         textureData[destIndex + 2] = color.b;
         textureData[destIndex + 3] = 255;  // Full opacity
       }
-
-      // // Debug first few pixels
-      // if (x < 3 && y < 3) {
-      //   OkLogger::info("Pixel color at " + std::to_string(x) + "," +
-      //                  std::to_string(y) + ": " + std::to_string(color.r) +
-      //                  "," + std::to_string(color.g) + "," +
-      //                  std::to_string(color.b));
-      // }
     }
   }
 }
@@ -614,28 +611,29 @@ void WADConverter::createFlatTexture(const std::string             &flatName,
   }
 
   // DOOM flats are always 64x64
-  const int FLAT_SIZE = 64;
+  const int FLAT_SIZE    = 64;
+  const int TOTAL_PIXELS = FLAT_SIZE * FLAT_SIZE;
 
   // Validate flat data size
-  if (flatData.data.size() != FLAT_SIZE * FLAT_SIZE) {
-    OkLogger::error("Invalid flat size for '" + flatName + "': " +
-                    std::to_string(flatData.data.size()) + " (expected " +
-                    std::to_string(FLAT_SIZE * FLAT_SIZE) + ")");
+  if ((int)flatData.data.size() != TOTAL_PIXELS) {
+    OkLogger::error("Invalid flat size for '" + flatName +
+                    "': " + std::to_string(flatData.data.size()) +
+                    " (expected " + std::to_string(TOTAL_PIXELS) + ")");
     return;
   }
 
   // Create texture data (RGBA format)
-  std::vector<unsigned char> textureData(FLAT_SIZE * FLAT_SIZE * 4, 0);
+  std::vector<unsigned char> textureData(TOTAL_PIXELS * 4, 0);
 
   // Convert flat data to RGBA using the palette
-  for (size_t i = 0; i < FLAT_SIZE * FLAT_SIZE; ++i) {
+  for (int i = 0; i < TOTAL_PIXELS; i++) {
     uint8_t colorIndex = flatData.data[i];
     if (colorIndex >= palette.size()) {
       continue;
     }
 
     const WAD::Color &color = palette[colorIndex];
-    size_t            idx   = i * 4;
+    int               idx   = i * 4;
     textureData[idx + 0]    = color.r;
     textureData[idx + 1]    = color.g;
     textureData[idx + 2]    = color.b;
@@ -680,7 +678,7 @@ void WADConverter::createTextureFromDef(
   bool   hasValidPatches = false;
 
   // For each patch in the texture
-  for (size_t i = 0; i < texDef.patches.size(); i++) {
+  for (int i = 0; i < texDef.patches.size(); i++) {
     const WAD::PatchInTexture &patchInfo = texDef.patches[i];
 
     // Skip invalid patch indices
