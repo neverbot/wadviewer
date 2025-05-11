@@ -76,6 +76,10 @@ void stepCallback(float deltaTime) {
     // Rotate 10 degree per second
     item2->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
   }
+  if (item) {
+    // Rotate 10 degree per second
+    item->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
+  }
 
   // Log only once per second for debugging
   static int frameCount = 0;
