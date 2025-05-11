@@ -335,10 +335,10 @@ int main(int argc, char *argv[]) {
     // Test item for Gui
     std::vector<float> squareVerts = {
         // Position (XYZ)    // Texture coords (UV)
-        -5.0f, 5.0f,  0.0f, 0.0f, 1.0f,  // Top left
-        5.0f,  5.0f,  0.0f, 1.0f, 1.0f,  // Top right
-        5.0f,  -5.0f, 0.0f, 1.0f, 0.0f,  // Bottom right
-        -5.0f, -5.0f, 0.0f, 0.0f, 0.0f   // Bottom left
+        -4.0f, 4.0f,  0.0f, 0.0f, 1.0f,  // Top left
+        4.0f,  4.0f,  0.0f, 1.0f, 1.0f,  // Top right
+        4.0f,  -4.0f, 0.0f, 1.0f, 0.0f,  // Bottom right
+        -4.0f, -4.0f, 0.0f, 0.0f, 0.0f   // Bottom left
     };
     std::vector<unsigned int> squareIndices = {
         0, 1, 2,  // First triangle
@@ -353,7 +353,7 @@ int main(int argc, char *argv[]) {
 
     // Initial position - straight in front of the camera (negative Z is
     // forward)
-    square->setPosition(0.0f, 0.0f, -30.0f);
+    square->setPosition(7.0f, -5.0f, -30.0f);
     // ************************************************************************
 
     // ************************************************************************
