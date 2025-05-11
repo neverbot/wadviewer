@@ -33,7 +33,13 @@ std::vector<std::string> textureNames;
 void stepCallback(float deltaTime) {
   OkInput     *input  = OkCore::getInput();
   OkInputState state  = input->getState();
-  OkCamera    *camera = OkCore::getCamera();  // curretn camera
+  OkCamera    *camera = OkCore::getCamera();  // current camera
+
+  // Check for exit condition
+  if (state.exit) {
+    OkCore::askForExit();
+    return;
+  }
 
   OkPoint forward = camera->getRotation().getForwardVector();
   OkPoint right   = camera->getRotation().getRightVector();
@@ -87,6 +93,11 @@ void stepCallback(float deltaTime) {
   if (frameCount++ % 60 == 0) {  // Assuming 60 FPS, adjust if different
     OkPoint position = camera->getPosition();
     OkLogger::info("Camera pos: " + position.toString());
+  }
+
+  // Action buttons
+  if (state.action1) {
+    OkLogger::info("Action 1 pressed");
   }
 }
 
