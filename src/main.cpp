@@ -72,13 +72,13 @@ void stepCallback(float deltaTime) {
   camera->setSpeed(direction.x(), direction.y(), direction.z());
 
   // Rotate item2 on the XY plane
-  if (item2) {
-    // Rotate 10 degree per second
-    item2->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
-  }
+  // if (item2) {
+  //   // Rotate 10 degree per second
+  //   item2->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
+  // }
   if (item) {
     // Rotate 10 degree per second
-    item->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
+    item->rotate(0.0f, glm::radians(0.1f * deltaTime), 0.0f);
   }
 
   // Log only once per second for debugging
@@ -351,23 +351,9 @@ int main(int argc, char *argv[]) {
     square->setDrawMode(GL_TRIANGLES);
     square->attachTo(camera);
 
-    // Initial position - straight in front and slightly down
+    // Initial position - straight in front of the camera (negative Z is
+    // forward)
     square->setPosition(0.0f, 0.0f, -30.0f);
-
-    // Make it face the camera by rotating 180° around Y
-    // OkRotation squareRot(0.0f, glm::pi<float>(),
-    //                      0.0f);  // 180° yaw to face camera
-    // square->setRotation(squareRot);
-
-    // Optional: Make square face camera
-    // OkRotation cameraRot = camera->getRotation();
-    // square->setRotation(cameraRot.getPitch() + glm::pi<float>() / 2.0f,
-    //                     cameraRot.getYaw(), 0.0f);
-
-    // Make square face the camera direction
-    // float squareYaw = cameraRot.getYaw() + glm::pi<float>();
-    // float squarePitch = cameraRot.getPitch() + glm::pi<float>() / 2.0f;
-    // square->setRotation(squarePitch, cameraRot.getYaw(), 0.0f);
     // ************************************************************************
 
     // ************************************************************************
@@ -392,12 +378,14 @@ int main(int argc, char *argv[]) {
     item2 = new OkItem("cube2", vertices.data(), vertices.size(),
                        indices.data(), indices.size());
     item2->setWireframe(true);
+    item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
 
     scene->addItem(item);
     item2->attachTo(item);
     // scene->addItem(item2);
-    item->setPosition(-2.0f, 0.0f, 0.0f);  // Left square
-    item2->setPosition(2.0f, 0.0f, 0.0f);  // Right square
+    item->setPosition(-2.0f, 0.0f, -10.0f);  // Left square
+    item2->setPosition(2.0f, 0.0f,
+                       0.0f);  // Right square (will be relative to item)
     // ************************************************************************
 
     for (size_t i = 0; i < levelItems.size(); ++i) {
