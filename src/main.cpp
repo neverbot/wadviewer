@@ -290,8 +290,9 @@ int main(int argc, char *argv[]) {
 
     // Create a secondary camera in the player start position
     OkPoint  *playerStart = converter.getPlayerStartPosition(level);
-    OkCamera *povCamera   = new OkCamera(OkConfig::getInt("window.width"),
-                                         OkConfig::getInt("window.height"));
+    OkCamera *povCamera =
+        new OkCamera("Player Camera", OkConfig::getInt("window.width"),
+                     OkConfig::getInt("window.height"));
 
     OkCore::addCamera(povCamera);
     // Slower speed for POV camera
@@ -320,6 +321,42 @@ int main(int argc, char *argv[]) {
                               axisIndices.data(), axisIndices.size());
     axes->setDrawMode(GL_LINES);
     scene->addItem(axes);
+
+    std::vector<float> squareVerts = {
+        // Position (XYZ)    // Texture coords (UV)
+        -5.0f, 5.0f,  0.0f, 0.0f, 1.0f,  // Top left
+        5.0f,  5.0f,  0.0f, 1.0f, 1.0f,  // Top right
+        5.0f,  -5.0f, 0.0f, 1.0f, 0.0f,  // Bottom right
+        -5.0f, -5.0f, 0.0f, 0.0f, 0.0f   // Bottom left
+    };
+    std::vector<unsigned int> squareIndices = {
+        0, 1, 2,  // First triangle
+        0, 2, 3   // Second triangle
+    };
+    OkItem *square =
+        new OkItem("square", squareVerts.data(), squareVerts.size(),
+                   squareIndices.data(), squareIndices.size());
+    square->setWireframe(true);
+    square->setDrawMode(GL_TRIANGLES);
+    square->attachTo(camera);
+
+    // Initial position - straight in front and slightly down
+    square->setPosition(0.0f, 0.0f, -30.0f);
+
+    // Make it face the camera by rotating 180° around Y
+    // OkRotation squareRot(0.0f, glm::pi<float>(),
+    //                      0.0f);  // 180° yaw to face camera
+    // square->setRotation(squareRot);
+
+    // Optional: Make square face camera
+    // OkRotation cameraRot = camera->getRotation();
+    // square->setRotation(cameraRot.getPitch() + glm::pi<float>() / 2.0f,
+    //                     cameraRot.getYaw(), 0.0f);
+
+    // Make square face the camera direction
+    // float squareYaw = cameraRot.getYaw() + glm::pi<float>();
+    // float squarePitch = cameraRot.getPitch() + glm::pi<float>() / 2.0f;
+    // square->setRotation(squarePitch, cameraRot.getYaw(), 0.0f);
 
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
