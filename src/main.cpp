@@ -22,9 +22,13 @@ enum class Format {
   DSL_VERBOSE
 };
 
-OkItem                  *item  = nullptr;
-OkItem                  *item2 = nullptr;
+OkItem *item   = nullptr;
+OkItem *item2  = nullptr;
+OkItem *square = nullptr;
+
+// Texture tester
 std::vector<std::string> textureNames;
+int                      currentTexture = 0;
 
 /**
  * @brief callback function for the step phase of the engine loop.
@@ -98,6 +102,15 @@ void stepCallback(float deltaTime) {
   // Action buttons
   if (state.action1) {
     OkLogger::info("Action 1 pressed");
+
+    currentTexture = (currentTexture + 1) % textureNames.size();
+
+    // Change the texture
+    OkTexture *texture = OkTextureHandler::getInstance()->getTexture(
+        textureNames[currentTexture]);
+    if (texture) {
+      square->setTexture("square", texture);
+    }
   }
 }
 
@@ -356,9 +369,8 @@ int main(int argc, char *argv[]) {
         0, 1, 2,  // First triangle
         0, 2, 3   // Second triangle
     };
-    OkItem *square =
-        new OkItem("square", squareVerts.data(), squareVerts.size(),
-                   squareIndices.data(), squareIndices.size());
+    square = new OkItem("square", squareVerts.data(), squareVerts.size(),
+                        squareIndices.data(), squareIndices.size());
     square->setWireframe(false);
     square->setDrawMode(GL_TRIANGLES);
     square->attachTo(camera);
@@ -368,13 +380,11 @@ int main(int argc, char *argv[]) {
     square->setPosition(7.0f, -5.0f, -30.0f);
 
     // Apply first texture from the texture handler to the square
-    textureNames = OkTextureHandler::getInstance()->getTextureNames();
-    OkTexture *texture =
-        OkTextureHandler::getInstance()->getTexture(textureNames[0]);
+    textureNames       = OkTextureHandler::getInstance()->getTextureNames();
+    OkTexture *texture = OkTextureHandler::getInstance()->getTexture(
+        textureNames[currentTexture]);
     if (texture) {
       square->setTexture("square", texture);
-    } else {
-      OkLogger::error("No texture found for square item");
     }
 
     // ************************************************************************
