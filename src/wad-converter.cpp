@@ -566,8 +566,8 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
         continue;
       }
 
-      // Calculate source and destination indices with bounds checking
-      int srcIndex = y * patch.width + x;
+      // Calculate source and destination indices
+      int srcIndex = (y * patch.width + x) * 4;  // RGBA format in source
       if (srcIndex >= (int)patch.pixels.size()) {
         OkLogger::error("Source index out of bounds in patch " +
                         std::string(patch.name, strnlen(patch.name, 8)));
@@ -581,20 +581,23 @@ void WADConverter::compositePatch(std::vector<unsigned char> &textureData,
         continue;
       }
 
-      // Get color index and validate
+      // Get palette index from red channel where we stored it
       uint8_t colorIndex = patch.pixels[srcIndex];
       if (colorIndex >= palette.size()) {
         continue;
       }
 
-      // Copy color from palette with opacity check
-      const WAD::Color &color = palette[colorIndex];
-      if (colorIndex > 0) {  // Index 0 is typically transparent
-        textureData[destIndex + 0] = color.r;
-        textureData[destIndex + 1] = color.g;
-        textureData[destIndex + 2] = color.b;
-        textureData[destIndex + 3] = 255;  // Full opacity
+      // Skip fully transparent pixels (index 0 in DOOM palette)
+      if (colorIndex == 0) {
+        continue;
       }
+
+      // Copy color from palette
+      const WAD::Color &color    = palette[colorIndex];
+      textureData[destIndex + 0] = color.r;
+      textureData[destIndex + 1] = color.g;
+      textureData[destIndex + 2] = color.b;
+      textureData[destIndex + 3] = 255;  // Full opacity
     }
   }
 }

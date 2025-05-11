@@ -248,11 +248,11 @@ WAD::PatchData WAD::readPatch(std::streamoff offset, std::size_t size,
         uint8_t pixel     = *column++;
         int     destIndex = ((topdelta + y) * patch.width + x) * 4;
 
-        // Convert palette index to RGBA (placeholder values for now)
-        patch.pixels[destIndex + 0] = pixel;  // R
-        patch.pixels[destIndex + 1] = pixel;  // G
-        patch.pixels[destIndex + 2] = pixel;  // B
-        patch.pixels[destIndex + 3] = 255;    // A
+        // Store raw palette index in the pixels array
+        patch.pixels[destIndex + 0] = pixel;  // Store palette index
+        patch.pixels[destIndex + 1] = 0;      // Not used
+        patch.pixels[destIndex + 2] = 0;      // Not used
+        patch.pixels[destIndex + 3] = 255;    // Fully opaque
       }
 
       column++;  // Skip padding byte
