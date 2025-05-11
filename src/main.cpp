@@ -22,6 +22,9 @@ enum class Format {
   DSL_VERBOSE
 };
 
+OkItem *item  = nullptr;
+OkItem *item2 = nullptr;
+
 /**
  * @brief callback function for the step phase of the engine loop.
  * @param deltaTime Time since the last frame in milliseconds.
@@ -29,7 +32,7 @@ enum class Format {
 void stepCallback(float deltaTime) {
   OkInput     *input  = OkCore::getInput();
   OkInputState state  = input->getState();
-  OkCamera    *camera = OkCore::getCamera();
+  OkCamera    *camera = OkCore::getCamera();  // curretn camera
 
   OkPoint forward = camera->getRotation().getForwardVector();
   OkPoint right   = camera->getRotation().getRightVector();
@@ -67,6 +70,12 @@ void stepCallback(float deltaTime) {
 
   // Set the camera's speed - this will be applied in OkObject::step
   camera->setSpeed(direction.x(), direction.y(), direction.z());
+
+  // Rotate item2 on the XY plane
+  if (item2) {
+    // Rotate 10 degree per second
+    item2->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
+  }
 
   // Log only once per second for debugging
   static int frameCount = 0;
@@ -288,6 +297,8 @@ int main(int argc, char *argv[]) {
     WADConverter          converter;
     std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
 
+    // ************************************************************************
+    // Secondary Camera
     // Create a secondary camera in the player start position
     OkPoint  *playerStart = converter.getPlayerStartPosition(level);
     OkCamera *povCamera =
@@ -300,28 +311,24 @@ int main(int argc, char *argv[]) {
     povCamera->setPosition(*playerStart);
     povCamera->setRotation(0.0f, 0.0f, 0.0f);
     povCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+    // ************************************************************************
 
-    for (size_t i = 0; i < levelItems.size(); ++i) {
-      levelItems[i]->setWireframe(false);
-      scene->addItem(levelItems[i]);
-    }
+    // ************************************************************************
+    // Third camera in 0,0,0
+    OkCamera *originCamera =
+        new OkCamera("Origin Camera", OkConfig::getInt("window.width"),
+                     OkConfig::getInt("window.height"));
 
-    // Position camera to view the entire level
-    positionCameraForLevel(camera, levelItems);
+    OkCore::addCamera(originCamera);
+    // Slower speed for POV camera
+    originCamera->setMaxVelocity(cameraSpeed * 0.5f);
+    originCamera->setPosition(0.0f, 0.0f, 0.0f);
+    originCamera->setRotation(0.0f, 0.0f, 0.0f);
+    originCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+    // ************************************************************************
 
-    // Add coordinate axes for reference
-    float              axisLength = 100.0f;
-    std::vector<float> axisVerts  = {
-        0, 0, 0, axisLength, 0,          0,           // X axis
-        0, 0, 0, 0,          axisLength, 0,           // Y axis
-        0, 0, 0, 0,          0,          -axisLength  // Z axis (-Z is forward)
-    };
-    std::vector<unsigned int> axisIndices = {0, 1, 2, 3, 4, 5};
-    OkItem *axes = new OkItem("axes", axisVerts.data(), axisVerts.size(),
-                              axisIndices.data(), axisIndices.size());
-    axes->setDrawMode(GL_LINES);
-    scene->addItem(axes);
-
+    // ************************************************************************
+    // Test item for Gui
     std::vector<float> squareVerts = {
         // Position (XYZ)    // Texture coords (UV)
         -5.0f, 5.0f,  0.0f, 0.0f, 1.0f,  // Top left
@@ -357,6 +364,45 @@ int main(int argc, char *argv[]) {
     // float squareYaw = cameraRot.getYaw() + glm::pi<float>();
     // float squarePitch = cameraRot.getPitch() + glm::pi<float>() / 2.0f;
     // square->setRotation(squarePitch, cameraRot.getYaw(), 0.0f);
+    // ************************************************************************
+
+    // ************************************************************************
+    // Create test items
+    std::vector<float> vertices = {
+        // Positions         // Texture coords
+        0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // top right
+        0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,  // bottom left
+        -0.5f, 0.5f,  0.0f, 0.0f, 1.0f   // top left
+    };
+
+    std::vector<unsigned int> indices = {
+        0, 1, 3,  // first Triangle
+        1, 2, 3   // second Triangle
+    };
+
+    item = new OkItem("cube", vertices.data(), vertices.size(), indices.data(),
+                      indices.size());
+    item->setWireframe(true);
+
+    item2 = new OkItem("cube2", vertices.data(), vertices.size(),
+                       indices.data(), indices.size());
+    item2->setWireframe(true);
+
+    scene->addItem(item);
+    item2->attachTo(item);
+    // scene->addItem(item2);
+    item->setPosition(-2.0f, 0.0f, 0.0f);  // Left square
+    item2->setPosition(2.0f, 0.0f, 0.0f);  // Right square
+    // ************************************************************************
+
+    for (size_t i = 0; i < levelItems.size(); ++i) {
+      levelItems[i]->setWireframe(false);
+      scene->addItem(levelItems[i]);
+    }
+
+    // Position camera to view the entire level
+    positionCameraForLevel(camera, levelItems);
 
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
