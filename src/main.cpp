@@ -22,8 +22,9 @@ enum class Format {
   DSL_VERBOSE
 };
 
-OkItem *item  = nullptr;
-OkItem *item2 = nullptr;
+OkItem                  *item  = nullptr;
+OkItem                  *item2 = nullptr;
+std::vector<std::string> textureNames;
 
 /**
  * @brief callback function for the step phase of the engine loop.
@@ -347,13 +348,24 @@ int main(int argc, char *argv[]) {
     OkItem *square =
         new OkItem("square", squareVerts.data(), squareVerts.size(),
                    squareIndices.data(), squareIndices.size());
-    square->setWireframe(true);
+    square->setWireframe(false);
     square->setDrawMode(GL_TRIANGLES);
     square->attachTo(camera);
 
     // Initial position - straight in front of the camera (negative Z is
     // forward)
     square->setPosition(7.0f, -5.0f, -30.0f);
+
+    // Apply first texture from the texture handler to the square
+    textureNames = OkTextureHandler::getInstance()->getTextureNames();
+    OkTexture *texture =
+        OkTextureHandler::getInstance()->getTexture(textureNames[0]);
+    if (texture) {
+      square->setTexture("square", texture);
+    } else {
+      OkLogger::error("No texture found for square item");
+    }
+
     // ************************************************************************
 
     // ************************************************************************
