@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Set the build type if not already defined
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
 endif()
+option(OKINAWA_BUILD_TESTS "Build okinawa tests" OFF)
 
 # Conan 2.x + CMake integration requires setting the toolchain before project()
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/build/conan_toolchain.cmake")
@@ -15,6 +17,19 @@ project(wadviewer
     VERSION 0.1.0
     DESCRIPTION "A WAD file viewer using the Okinawa engine"
     LANGUAGES CXX)
+
+# Enable clang-tidy
+find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+if(CLANG_TIDY_EXE)
+    set(CMAKE_CXX_CLANG_TIDY 
+        ${CLANG_TIDY_EXE};
+        -extra-arg=-Wno-unknown-warning-option;
+        -p=${CMAKE_BINARY_DIR}
+    )
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+else()
+    message(WARNING "clang-tidy not found!")
+endif()
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -43,7 +58,9 @@ add_subdirectory(okinawa.cpp)
 # Source files for wadviewer
 file(GLOB_RECURSE PROJECT_SOURCES 
     src/*.cpp
-    src/*.hpp)
+    src/*/*.cpp
+    src/*.hpp
+    src/*/*.hpp)
 
 # Create main executable target
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
@@ -75,5 +92,13 @@ endif()
 
 # Enable warnings
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall 
+        # -Wextra 
+        # -Wpedantic
+        -Wundef                      # Warn on undefined macro usage
+        # -Wreserved-macro-identifier  # Warn on reserved macro names
+        -Wmacro-redefined            # Warn on macro redefinition
+        -Wextra-semi                 # Warn on redundant semicolons
+    )    
 endif()

@@ -17,22 +17,41 @@ A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://g
 
 ## Building from Source
 
+The executable will be created in `build/bin/wadviewer`.
+
+### Debug Build
+
 ```bash
-# Clone the repository with submodules:
+# Clone the repository with submodules
 git clone --recursive https://github.com/yourusername/wadviewer.git
 cd wadviewer
 
-# Install dependencies using Conan:
-conan install . --output-folder=build --build=missing
+# Install dependencies using Conan
+conan install . --output-folder=build -s build_type=Debug --build=missing
 
-# Configure with CMake:
-cmake -B build -S .
+# Configure with CMake
+cmake --preset debug
 
-# Build the project:
-cmake --build build
+# Build the project
+cmake --build --preset debug
 ```
 
-The executable will be created in `build/bin/wadviewer`.
+### Release Build
+
+```bash
+# Clone the repository with submodules
+git clone --recursive https://github.com/yourusername/wadviewer.git
+cd wadviewer
+
+# Install dependencies using Conan
+conan install . --output-folder=build -s build_type=Release --build=missing
+
+# Configure with CMake
+cmake --preset release
+
+# Build the project
+cmake --build --preset release
+```
 
 ## Usage
 

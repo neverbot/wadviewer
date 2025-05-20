@@ -1,0 +1,58 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug",
+      "description": "Debug build with tests enabled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OKINAWA_BUILD_TESTS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/conan_toolchain.cmake",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/build"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release",
+      "description": "Release build with tests disabled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OKINAWA_BUILD_TESTS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/conan_toolchain.cmake",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/build"
+      }
+    }    
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "jobs": 4
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "jobs": 4
+    }    
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": false}
+    }
+  ]
+}
