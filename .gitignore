@@ -38,11 +38,9 @@
 *.x86_64
 *.hex
 
-# libraries
-lib/*/build/
-lib/*/CMakeCache.txt
-lib/*/CMakeFiles
-lib/*/.github
+# cmake
+CMakePresets.txt
+CMakeUserPresets.json
 
 # build
 .conan
