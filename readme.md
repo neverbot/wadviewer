@@ -98,8 +98,9 @@ Example:
 ## Dependencies
 
 All dependencies are managed through Conan:
-- GLM: OpenGL Mathematics library
-- GLFW: OpenGL context and window management
-- STB: Image loading
-- nlohmann_json: JSON parsing
-- OpenGL: 3D graphics
+
+- [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
+- [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
+- [nlohmann_json](https://github.com/nlohmann/json): JSON parsing.
+- [OpenGL](https://www.opengl.org/): 3D graphics.
+- [GLFW](https://github.com/glfw/glfw): OpenGL context and window management.
