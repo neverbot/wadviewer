@@ -10,8 +10,8 @@ public:
   WADConverter()  = default;
   ~WADConverter() = default;
 
-  std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
-  static OkPoint       *getPlayerStartPosition(const WAD::Level &level);
+  static std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
+  static OkPoint              *getPlayerStartPosition(const WAD::Level &level);
 
 private:
   static float       centerX;
