@@ -2,14 +2,13 @@
 #include "../okinawa.cpp/src/core/camera.hpp"
 #include "../okinawa.cpp/src/core/core.hpp"
 #include "../okinawa.cpp/src/handlers/scenes.hpp"
-#include "../okinawa.cpp/src/importers/wavefront.hpp"
 #include "../okinawa.cpp/src/input/input.hpp"
 #include "../okinawa.cpp/src/scene/scene.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include <cmath>
 #include <iostream>
-#include <map>
 
+#include "./gui.hpp"
 #include "./wad-converter.hpp"
 #include "./wad.hpp"
 
@@ -22,13 +21,9 @@ enum class Format {
   DSL_VERBOSE
 };
 
-OkItem *item   = nullptr;
-OkItem *item2  = nullptr;
-OkItem *square = nullptr;
-
-// Texture tester
-std::vector<std::string> textureNames;
-int                      currentTexture = 0;
+OkItem *item  = nullptr;
+OkItem *item2 = nullptr;
+GUI    *gui   = nullptr;
 
 /**
  * @brief callback function for the step phase of the engine loop.
@@ -43,6 +38,11 @@ void stepCallback(float deltaTime) {
   if (state.exit) {
     OkCore::askForExit();
     return;
+  }
+
+  // Update GUI
+  if (gui) {
+    gui->step(state);
   }
 
   OkPoint forward = camera->getRotation().getForwardVector();
@@ -97,20 +97,6 @@ void stepCallback(float deltaTime) {
   if (frameCount++ % 60 == 0) {  // Assuming 60 FPS, adjust if different
     OkPoint position = camera->getPosition();
     OkLogger::info("Camera pos: " + position.toString());
-  }
-
-  // Action buttons
-  if (state.action1) {
-    OkLogger::info("Action 1 pressed");
-
-    currentTexture = (currentTexture + 1) % textureNames.size();
-
-    // Change the texture
-    OkTexture *texture = OkTextureHandler::getInstance()->getTexture(
-        textureNames[currentTexture]);
-    if (texture) {
-      square->setTexture("square", texture);
-    }
   }
 }
 
@@ -183,8 +169,8 @@ void positionCameraForLevel(OkCamera                    *camera,
   }
 
   // Calculate level dimensions
-  float width       = maxX - minX;
-  float height      = maxY - minY;
+  float width = maxX - minX;
+  // float height      = maxY - minY;
   float depth       = maxZ - minZ;
   float levelRadius = sqrt(width * width + depth * depth) * 0.5f;
 
@@ -356,36 +342,8 @@ int main(int argc, char *argv[]) {
     originCamera->setPerspective(45.0f, 0.1f, 2000.0f);
     // ************************************************************************
 
-    // ************************************************************************
-    // Test item for Gui
-    std::vector<float> squareVerts = {
-        // Position (XYZ)    // Texture coords (UV)
-        -4.0f, 4.0f,  0.0f, 0.0f, 1.0f,  // Top left
-        4.0f,  4.0f,  0.0f, 1.0f, 1.0f,  // Top right
-        4.0f,  -4.0f, 0.0f, 1.0f, 0.0f,  // Bottom right
-        -4.0f, -4.0f, 0.0f, 0.0f, 0.0f   // Bottom left
-    };
-    std::vector<unsigned int> squareIndices = {
-        0, 1, 2,  // First triangle
-        0, 2, 3   // Second triangle
-    };
-    square = new OkItem("square", squareVerts.data(), squareVerts.size(),
-                        squareIndices.data(), squareIndices.size());
-    square->setWireframe(false);
-    square->setDrawMode(GL_TRIANGLES);
-    square->attachTo(camera);
-
-    // Initial position - straight in front of the camera (negative Z is
-    // forward)
-    square->setPosition(7.0f, -5.0f, -30.0f);
-
-    // Apply first texture from the texture handler to the square
-    textureNames       = OkTextureHandler::getInstance()->getTextureNames();
-    OkTexture *texture = OkTextureHandler::getInstance()->getTexture(
-        textureNames[currentTexture]);
-    if (texture) {
-      square->setTexture("square", texture);
-    }
+    // Initialize GUI
+    gui = new GUI(camera);
 
     // ************************************************************************
 
@@ -448,11 +406,7 @@ int main(int argc, char *argv[]) {
   OkCore::loop(stepCallback, drawCallback);
 
   // Cleanup
-  // delete item;
-  // delete item2;
-  // delete model;
-  // delete model2;
-  // delete floor;
+  delete gui;  // Clean up GUI
 
   // objects are deleted in the scene destructor
   delete scene;

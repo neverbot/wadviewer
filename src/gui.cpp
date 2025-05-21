@@ -1,0 +1,74 @@
+#include "gui.hpp"
+#include "../okinawa.cpp/src/utils/logger.hpp"
+
+GUI::GUI(OkCamera *camera) : currentTextureIndex(0) {
+  // Create texture preview square
+  std::vector<float> squareVerts = {
+      // Position (XYZ)    // Texture coords (UV)
+      -4.0f, 4.0f,  0.0f, 0.0f, 1.0f,  // Top left
+      4.0f,  4.0f,  0.0f, 1.0f, 1.0f,  // Top right
+      4.0f,  -4.0f, 0.0f, 1.0f, 0.0f,  // Bottom right
+      -4.0f, -4.0f, 0.0f, 0.0f, 0.0f   // Bottom left
+  };
+
+  std::vector<unsigned int> squareIndices = {
+      0, 1, 2,  // First triangle
+      0, 2, 3   // Second triangle
+  };
+
+  texturePreview = new OkItem("texture_preview", squareVerts.data(),
+                              (long)squareVerts.size(), squareIndices.data(),
+                              squareIndices.size());
+
+  texturePreview->setWireframe(false);
+  texturePreview->setDrawMode(GL_TRIANGLES);
+  texturePreview->attachTo(camera);
+
+  // Position in front of the camera
+  texturePreview->setPosition(7.0f, -5.0f, -30.0f);
+
+  // Get available textures
+  textureNames = OkTextureHandler::getInstance()->getTextureNames();
+
+  // Apply first texture
+  if (!textureNames.empty()) {
+    OkTexture *texture =
+        OkTextureHandler::getInstance()->getTexture(textureNames[0]);
+    if (texture) {
+      texturePreview->setTexture("texture_preview", texture);
+    }
+  }
+}
+
+GUI::~GUI() {
+  delete texturePreview;
+}
+
+void GUI::step(const OkInputState &input) {
+  if (input.action1) {  // Space bar
+    nextTexture();
+  }
+
+  if (input.action2) {  // T key
+    toggleVisibility();
+  }
+}
+
+void GUI::toggleVisibility() {
+  texturePreview->setVisible(!texturePreview->isVisible());
+}
+
+void GUI::nextTexture() {
+  if (textureNames.empty())
+    return;
+
+  currentTextureIndex = (currentTextureIndex + 1) % textureNames.size();
+  OkTexture *texture  = OkTextureHandler::getInstance()->getTexture(
+      textureNames[currentTextureIndex]);
+
+  if (texture) {
+    texturePreview->setTexture("texture_preview", texture);
+    OkLogger::info("GUI :: Switched to texture: " +
+                   textureNames[currentTextureIndex]);
+  }
+}
