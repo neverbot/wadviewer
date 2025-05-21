@@ -16,9 +16,10 @@ GUI::GUI(OkCamera *camera) : currentTextureIndex(0) {
       0, 2, 3   // Second triangle
   };
 
-  texturePreview = new OkItem("texture_preview", squareVerts.data(),
-                              (long)squareVerts.size(), squareIndices.data(),
-                              squareIndices.size());
+  texturePreview =
+      new OkItem("texture_preview", squareVerts.data(),
+                 static_cast<int>(squareVerts.size()), squareIndices.data(),
+                 static_cast<int>(squareIndices.size()));
 
   texturePreview->setWireframe(false);
   texturePreview->setDrawMode(GL_TRIANGLES);
@@ -62,8 +63,9 @@ void GUI::nextTexture() {
   if (textureNames.empty())
     return;
 
-  currentTextureIndex = (currentTextureIndex + 1) % textureNames.size();
-  OkTexture *texture  = OkTextureHandler::getInstance()->getTexture(
+  currentTextureIndex =
+      (currentTextureIndex + 1) % static_cast<int>(textureNames.size());
+  OkTexture *texture = OkTextureHandler::getInstance()->getTexture(
       textureNames[currentTextureIndex]);
 
   if (texture) {

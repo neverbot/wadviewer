@@ -302,13 +302,13 @@ int main(int argc, char *argv[]) {
                      std::string(level.name, strnlen(level.name, 8)));
 
       // Create level geometry using the converter
-      WADConverter          converter;
-      std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
+      std::vector<OkItem *> levelItems =
+          WADConverter::createLevelGeometry(level);
 
       // ************************************************************************
       // Secondary Camera
       // Create a secondary camera in the player start position
-      OkPoint  *playerStart = converter.getPlayerStartPosition(level);
+      OkPoint  *playerStart = WADConverter::getPlayerStartPosition(level);
       OkCamera *povCamera =
           new OkCamera("Player Camera", OkConfig::getInt("window.width"),
                        OkConfig::getInt("window.height"));
@@ -355,12 +355,14 @@ int main(int argc, char *argv[]) {
           1, 2, 3   // second Triangle
       };
 
-      item = new OkItem("cube", vertices.data(), vertices.size(),
-                        indices.data(), indices.size());
+      item =
+          new OkItem("cube", vertices.data(), static_cast<int>(vertices.size()),
+                     indices.data(), static_cast<int>(indices.size()));
       item->setWireframe(true);
 
-      item2 = new OkItem("cube2", vertices.data(), vertices.size(),
-                         indices.data(), indices.size());
+      item2 = new OkItem("cube2", vertices.data(),
+                         static_cast<int>(vertices.size()), indices.data(),
+                         static_cast<int>(indices.size()));
       item2->setWireframe(true);
       item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
 
