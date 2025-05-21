@@ -35,8 +35,8 @@ WAD::WAD(const std::string &filepath, bool verbose) {
   }
 
   if (verbose_) {
-    std::cout << "WAD type: " << id << std::endl;
-    std::cout << "Num lumps: " << header_.numlumps << std::endl;
+    std::cout << "WAD type: " << id << "\n";
+    std::cout << "Num lumps: " << header_.numlumps << "\n";
   }
 
   // Read directory
@@ -283,6 +283,9 @@ std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
   uint32_t num_patches;
   std::memcpy(&num_patches, data.data(), sizeof(uint32_t));
 
+  // Pre-allocate vector capacity
+  names.reserve(num_patches);
+
   // Read patch names (8 bytes each, zero-terminated)
   const char *name_data = reinterpret_cast<const char *>(data.data() + 4);
   for (uint32_t i = 0; i < num_patches; i++) {
@@ -307,6 +310,9 @@ std::vector<WAD::TextureDef> WAD::readTextureDefs(std::streamoff offset,
   uint32_t num_textures;
   std::memcpy(&num_textures, data.data(), sizeof(uint32_t));
 
+  // Pre-allocate vectors
+  textures.reserve(num_textures);
+
   // Get offsets to each texture
   std::vector<uint32_t> offsets(num_textures);
   std::memcpy(offsets.data(), data.data() + 4, num_textures * sizeof(uint32_t));
@@ -323,6 +329,9 @@ std::vector<WAD::TextureDef> WAD::readTextureDefs(std::streamoff offset,
     std::memcpy(&tex.height, tex_data + 14, 2);
     std::memcpy(&tex.column_dir, tex_data + 16, 4);
     std::memcpy(&tex.patch_count, tex_data + 20, 2);
+
+    // Pre-allocate patches vector
+    tex.patches.reserve(tex.patch_count);
 
     // Read patches
     const uint8_t *patch_data = tex_data + 22;
@@ -419,6 +428,8 @@ void WAD::processWAD() {
     // Count how many patches we actually need
     size_t                   requiredCount = 0;
     std::vector<std::string> missingPatches;
+    missingPatches.reserve(patchNames.size());  // Pre-allocate worst case
+
     for (size_t i = 0; i < requiredPatches.size(); i++) {
       if (requiredPatches[i]) {
         requiredCount++;
