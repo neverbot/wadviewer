@@ -10,10 +10,6 @@ float       WADConverter::centerX = 0.0f;
 float       WADConverter::centerY = 0.0f;
 const float WADConverter::SCALE   = 1.0f;
 
-// Empty constructor/destructor
-WADConverter::WADConverter() {}
-WADConverter::~WADConverter() {}
-
 void WADConverter::createWallSection(const WAD::Vertex &vertex1,
                                      const WAD::Vertex &vertex2,
                                      float bottomHeight, float topHeight,
@@ -36,8 +32,8 @@ void WADConverter::createWallSection(const WAD::Vertex &vertex1,
   }
 
   // Calculate real-world wall length (before scaling)
-  float wallLength =
-      sqrt(pow(vertex2.x - vertex1.x, 2) + pow(vertex2.y - vertex1.y, 2));
+  float wallLength = sqrtf(powf(vertex2.x - vertex1.x, 2.0f) +
+                           powf(vertex2.y - vertex1.y, 2.0f));
 
   // DOOM texture constants
   const float TEXTURE_WIDTH  = 64.0f;

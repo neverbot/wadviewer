@@ -7,8 +7,8 @@
 
 class WADConverter {
 public:
-  WADConverter();
-  ~WADConverter();
+  WADConverter()  = default;
+  ~WADConverter() = default;
 
   std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
   OkPoint              *getPlayerStartPosition(const WAD::Level &level);
@@ -37,11 +37,11 @@ private:
     return crossProduct > 0;
   }
 
-  void createWallSection(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
-                         float bottomHeight, float topHeight,
-                         const WAD::Sidedef        &sidedef,
-                         std::vector<float>        &vertices,
-                         std::vector<unsigned int> &indices);
+  static void createWallSection(const WAD::Vertex &vertex1,
+                                const WAD::Vertex &vertex2, float bottomHeight,
+                                float topHeight, const WAD::Sidedef &sidedef,
+                                std::vector<float>        &vertices,
+                                std::vector<unsigned int> &indices);
 
   void createSectorGeometry(const WAD::Level &level, const WAD::Sector &sector,
                             const std::vector<int>    &sectorVertices,

@@ -3,6 +3,7 @@
 #include "../okinawa.cpp/src/core/core.hpp"
 #include "../okinawa.cpp/src/handlers/scenes.hpp"
 #include "../okinawa.cpp/src/input/input.hpp"
+#include "../okinawa.cpp/src/math/math.hpp"
 #include "../okinawa.cpp/src/scene/scene.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include <cmath>
@@ -11,15 +12,6 @@
 #include "./gui.hpp"
 #include "./wad-converter.hpp"
 #include "./wad.hpp"
-
-// enum with the possible formats for the file to view
-enum class Format {
-  WAD,
-  JSON,
-  JSON_VERBOSE,
-  DSL,
-  DSL_VERBOSE
-};
 
 OkItem *item  = nullptr;
 OkItem *item2 = nullptr;
@@ -212,204 +204,212 @@ void positionCameraForLevel(OkCamera                    *camera,
  * @return Exit status.
  */
 int main(int argc, char *argv[]) {
-  OkLogger::info("Main :: Starting up...");
-  OkCore::initialize();
-
-  // Set initial camera
-  OkCamera  *camera = OkCore::getCamera();
-  OkPoint    position(0.0f, 100.0f, 200.0f);  // Lower height, moved back
-  float      pitch = glm::radians(-30.0f);    // Looking down 30 degrees
-  float      yaw   = 0.0f;                    // Looking towards -Z
-  OkRotation rotation(pitch, yaw, 0.0f);
-
-  // Set maximum velocity (don't set speed directly)
-  const float cameraSpeed = 10.0f;  // Units per second
-  camera->setMaxVelocity(cameraSpeed);
-
-  // Not needed, will be set in positionCameraForItem
-  // camera->setPosition(position);
-  // camera->setRotation(rotation);
-  // camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
-
-  // Create main scene
-  OkScene *scene = new OkScene("MainScene");
-
-  // Set up scene
-  OkSceneHandler *sceneHandler = OkCore::getSceneHandler();
-  sceneHandler->addScene(scene, "MainScene");
-  sceneHandler->setScene(0);
-
-  OkScene *currentScene = sceneHandler->getCurrentScene();
-  if (currentScene) {
-    OkLogger::info("Game :: Current scene: " + currentScene->getName());
-  } else {
-    OkLogger::error("Game :: No current scene found");
-  }
-
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-
-  // clang-format off
-  if (argc < 2 || argc > 4) {
-    std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>]\n";
-    std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
-    std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
-    std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
-    return 1;
-  }
-  // clang-format on
-
-  Format      format = Format::WAD;  // Default format
-  std::string contentFile;
-  std::string levelName = "";  // Empty string means use first level
-
-  // Check if first argument is a format specification
-  if (argv[1][0] == '-') {
-    std::string formatStr = argv[1];
-    formatStr             = formatStr.substr(1);  // Remove the leading '-'
-
-    if (formatStr == "wad") {
-      format = Format::WAD;
-    } else if (formatStr == "json") {
-      format = Format::JSON;
-    } else if (formatStr == "dsl") {
-      format = Format::DSL;
-    } else {
-      std::cerr << "Invalid format specified. Using default (wad)\n";
-    }
-
-    contentFile = argv[2];
-    if (argc == 4) {
-      levelName = argv[3];
-    }
-  } else {
-    // No format specified, use defaults
-    contentFile = argv[1];
-    if (argc == 3) {
-      levelName = argv[2];
-    }
-  }
-
   try {
-    WAD wad(contentFile);  // Verbose mode
-    wad.processWAD();
+    OkLogger::info("Main :: Starting up...");
+    OkCore::initialize();
 
-    // If no level name was provided, use the first level
-    if (levelName.empty()) {
-      levelName = wad.getLevelNameByIndex(0);
-      // OkLogger::info("Using first level: " + levelName);
+    // Set initial camera
+    OkCamera  *camera = OkCore::getCamera();
+    OkPoint    position(0.0f, 100.0f, 200.0f);  // Lower height, moved back
+    float      pitch = glm::radians(-30.0f);    // Looking down 30 degrees
+    float      yaw   = 0.0f;                    // Looking towards -Z
+    OkRotation rotation(pitch, yaw, 0.0f);
+
+    // Set maximum velocity (don't set speed directly)
+    const float cameraSpeed = 10.0f;  // Units per second
+    camera->setMaxVelocity(cameraSpeed);
+
+    // Not needed, will be set in positionCameraForItem
+    // camera->setPosition(position);
+    // camera->setRotation(rotation);
+    // camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
+
+    // Create main scene
+    OkScene *scene = new OkScene("MainScene");
+
+    // Set up scene
+    OkSceneHandler *sceneHandler = OkCore::getSceneHandler();
+    sceneHandler->addScene(scene, "MainScene");
+    sceneHandler->setScene(0);
+
+    OkScene *currentScene = sceneHandler->getCurrentScene();
+    if (currentScene) {
+      OkLogger::info("Game :: Current scene: " + currentScene->getName());
+    } else {
+      OkLogger::error("Game :: No current scene found");
     }
 
-    WAD::Level level = wad.getLevel(levelName);
-    OkLogger::info("Level name: " +
-                   std::string(level.name, strnlen(level.name, 8)));
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
 
-    // Create level geometry using the converter
-    WADConverter          converter;
-    std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
+    // clang-format off
+    if (argc < 2 || argc > 4) {
+      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>]\n";
+      std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
+      std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
+      std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
+      return 1;
+    }
+    // clang-format on
 
-    // ************************************************************************
-    // Secondary Camera
-    // Create a secondary camera in the player start position
-    OkPoint  *playerStart = converter.getPlayerStartPosition(level);
-    OkCamera *povCamera =
-        new OkCamera("Player Camera", OkConfig::getInt("window.width"),
-                     OkConfig::getInt("window.height"));
+    WADFormat   format = WADFormat::WAD;  // Default format
+    std::string contentFile;
+    std::string levelName = "";  // Empty string means use first level
 
-    OkCore::addCamera(povCamera);
-    // Slower speed for POV camera
-    povCamera->setMaxVelocity(cameraSpeed * 0.5f);
-    povCamera->setPosition(*playerStart);
-    povCamera->setRotation(0.0f, 0.0f, 0.0f);
-    povCamera->setPerspective(45.0f, 0.1f, 2000.0f);
-    // ************************************************************************
+    // Check if first argument is a format specification
+    if (argv[1][0] == '-') {
+      std::string formatStr = argv[1];
+      formatStr             = formatStr.substr(1);  // Remove the leading '-'
 
-    // ************************************************************************
-    // Third camera in 0,0,0
-    OkCamera *originCamera =
-        new OkCamera("Origin Camera", OkConfig::getInt("window.width"),
-                     OkConfig::getInt("window.height"));
+      if (formatStr == "wad") {
+        format = WADFormat::WAD;
+      } else if (formatStr == "json") {
+        format = WADFormat::JSON;
+      } else if (formatStr == "dsl") {
+        format = WADFormat::DSL;
+      } else {
+        std::cerr << "Invalid format specified. Using default (wad)\n";
+      }
 
-    OkCore::addCamera(originCamera);
-    // Slower speed for POV camera
-    originCamera->setMaxVelocity(cameraSpeed * 0.5f);
-    originCamera->setPosition(0.0f, 0.0f, 0.0f);
-    originCamera->setRotation(0.0f, 0.0f, 0.0f);
-    originCamera->setPerspective(45.0f, 0.1f, 2000.0f);
-    // ************************************************************************
-
-    // Initialize GUI
-    gui = new GUI(camera);
-
-    // ************************************************************************
-
-    // ************************************************************************
-    // Create test items
-    std::vector<float> vertices = {
-        // Positions         // Texture coords
-        0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // top right
-        0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,  // bottom left
-        -0.5f, 0.5f,  0.0f, 0.0f, 1.0f   // top left
-    };
-
-    std::vector<unsigned int> indices = {
-        0, 1, 3,  // first Triangle
-        1, 2, 3   // second Triangle
-    };
-
-    item = new OkItem("cube", vertices.data(), vertices.size(), indices.data(),
-                      indices.size());
-    item->setWireframe(true);
-
-    item2 = new OkItem("cube2", vertices.data(), vertices.size(),
-                       indices.data(), indices.size());
-    item2->setWireframe(true);
-    item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
-
-    scene->addItem(item);
-    item2->attachTo(item);
-    // scene->addItem(item2);
-    item->setPosition(-2.0f, 0.0f, -10.0f);  // Left square
-    item2->setPosition(2.0f, 0.0f,
-                       0.0f);  // Right square (will be relative to item)
-    // ************************************************************************
-
-    for (size_t i = 0; i < levelItems.size(); ++i) {
-      levelItems[i]->setWireframe(false);
-      scene->addItem(levelItems[i]);
+      contentFile = argv[2];
+      if (argc == 4) {
+        levelName = argv[3];
+      }
+    } else {
+      // No format specified, use defaults
+      contentFile = argv[1];
+      if (argc == 3) {
+        levelName = argv[2];
+      }
     }
 
-    // Position camera to view the entire level
-    positionCameraForLevel(camera, levelItems);
+    try {
+      WAD wad(contentFile, format);  // Verbose mode
+      wad.processWAD();
 
+      // If no level name was provided, use the first level
+      if (levelName.empty()) {
+        levelName = wad.getLevelNameByIndex(0);
+        // OkLogger::info("Using first level: " + levelName);
+      }
+
+      WAD::Level level = wad.getLevel(levelName);
+      OkLogger::info("Level name: " +
+                     std::string(level.name, strnlen(level.name, 8)));
+
+      // Create level geometry using the converter
+      WADConverter          converter;
+      std::vector<OkItem *> levelItems = converter.createLevelGeometry(level);
+
+      // ************************************************************************
+      // Secondary Camera
+      // Create a secondary camera in the player start position
+      OkPoint  *playerStart = converter.getPlayerStartPosition(level);
+      OkCamera *povCamera =
+          new OkCamera("Player Camera", OkConfig::getInt("window.width"),
+                       OkConfig::getInt("window.height"));
+
+      OkCore::addCamera(povCamera);
+      // Slower speed for POV camera
+      povCamera->setMaxVelocity(cameraSpeed * 0.5f);
+      povCamera->setPosition(*playerStart);
+      povCamera->setRotation(0.0f, 0.0f, 0.0f);
+      povCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+      // ************************************************************************
+
+      // ************************************************************************
+      // Third camera in 0,0,0
+      OkCamera *originCamera =
+          new OkCamera("Origin Camera", OkConfig::getInt("window.width"),
+                       OkConfig::getInt("window.height"));
+
+      OkCore::addCamera(originCamera);
+      // Slower speed for POV camera
+      originCamera->setMaxVelocity(cameraSpeed * 0.5f);
+      originCamera->setPosition(0.0f, 0.0f, 0.0f);
+      originCamera->setRotation(0.0f, 0.0f, 0.0f);
+      originCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+      // ************************************************************************
+
+      // Initialize GUI
+      gui = new GUI(camera);
+
+      // ************************************************************************
+
+      // ************************************************************************
+      // Create test items
+      std::vector<float> vertices = {
+          // Positions         // Texture coords
+          0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // top right
+          0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
+          -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,  // bottom left
+          -0.5f, 0.5f,  0.0f, 0.0f, 1.0f   // top left
+      };
+
+      std::vector<unsigned int> indices = {
+          0, 1, 3,  // first Triangle
+          1, 2, 3   // second Triangle
+      };
+
+      item = new OkItem("cube", vertices.data(), vertices.size(),
+                        indices.data(), indices.size());
+      item->setWireframe(true);
+
+      item2 = new OkItem("cube2", vertices.data(), vertices.size(),
+                         indices.data(), indices.size());
+      item2->setWireframe(true);
+      item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
+
+      scene->addItem(item);
+      item2->attachTo(item);
+      // scene->addItem(item2);
+      item->setPosition(-2.0f, 0.0f, -10.0f);  // Left square
+      item2->setPosition(2.0f, 0.0f,
+                         0.0f);  // Right square (will be relative to item)
+      // ************************************************************************
+
+      for (size_t i = 0; i < levelItems.size(); ++i) {
+        levelItems[i]->setWireframe(false);
+        scene->addItem(levelItems[i]);
+      }
+
+      // Position camera to view the entire level
+      positionCameraForLevel(camera, levelItems);
+
+    } catch (const std::exception &e) {
+      std::cerr << "Error: " << e.what() << "\n";
+      return 1;
+    }
+
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+    // ******************************************************************************************
+
+    OkLogger::info("Scene :: Item count: " +
+                   std::to_string(scene->getItemCount()));
+
+    // Start game loop
+    OkCore::loop(stepCallback, drawCallback);
+
+    // Cleanup
+    delete gui;  // Clean up GUI
+
+    // objects are deleted in the scene destructor
+    delete scene;
+
+    return 1;
   } catch (const std::exception &e) {
-    std::cerr << "Error: " << e.what() << "\n";
+    OkLogger::error("Main :: Unhandled exception: " + std::string(e.what()));
+    return 1;
+  } catch (...) {
+    OkLogger::error("Main :: Unknown unhandled exception");
     return 1;
   }
-
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-  // ******************************************************************************************
-
-  OkLogger::info("Scene :: Item count: " +
-                 std::to_string(scene->getItemCount()));
-
-  // Start game loop
-  OkCore::loop(stepCallback, drawCallback);
-
-  // Cleanup
-  delete gui;  // Clean up GUI
-
-  // objects are deleted in the scene destructor
-  delete scene;
-
-  return 1;
 }

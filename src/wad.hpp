@@ -2,15 +2,32 @@
 #define WAD_VIEWER_WAD_HPP
 
 #include <cstdint>
-#include <fstream>
-#include <stdexcept>
 #include <string>
 #include <vector>
+
+/**
+ * enum with the possible formats for the file to be loaded or written.
+ * - WAD: Standard WAD format
+ * - JSON: JSON format
+ * - JSON_VERBOSE: JSON format with verbose output
+ * - DSL: Custom DSL format
+ * - DSL_VERBOSE: Custom DSL format with verbose output
+ * The format is used to determine how to read or write the file.
+ * The default format is WAD.
+ */
+enum class WADFormat : std::uint8_t {
+  WAD,
+  JSON,
+  JSON_VERBOSE,
+  DSL,
+  DSL_VERBOSE
+};
 
 class WAD {
 public:
   // Constructor takes WAD file path
-  explicit WAD(const std::string &filepath, bool verbose = false);
+  explicit WAD(const std::string &filepath, WADFormat format,
+               bool verbose = false);
 
   // WAD header structure
   struct Header {

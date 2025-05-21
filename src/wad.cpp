@@ -12,7 +12,7 @@
  * @throws std::runtime_error if the file cannot be opened or is not a valid WAD
  * file
  */
-WAD::WAD(const std::string &filepath, bool verbose) {
+WAD::WAD(const std::string &filepath, WADFormat format, bool verbose) {
   filepath_ = filepath;
   verbose_  = verbose;
 
