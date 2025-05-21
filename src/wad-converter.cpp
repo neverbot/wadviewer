@@ -106,7 +106,7 @@ WADConverter::createLevelGeometry(const WAD::Level &level) {
   float minY = std::numeric_limits<float>::max();
   float maxY = std::numeric_limits<float>::lowest();
 
-  for (int i = 0; i < (int)level.vertices.size(); i++) {
+  for (size_t i = 0; i < level.vertices.size(); i++) {
     const WAD::Vertex &vertex = level.vertices[i];
     minX                      = std::min(minX, static_cast<float>(vertex.x));
     maxX                      = std::max(maxX, static_cast<float>(vertex.x));
@@ -395,12 +395,12 @@ void WADConverter::createSectorGeometry(const WAD::Level       &level,
   }
 
   // Create triangles using a simple triangle fan
-  for (int i = 1; i < (int)sectorVertices.size() - 1; i++) {
+  for (size_t i = 1; i < sectorVertices.size() - 1; i++) {
     if (isFloor) {
       // Floor - CCW winding
-      indices.push_back(baseIndex);          // Center
-      indices.push_back(baseIndex + i);      // Current
-      indices.push_back(baseIndex + i + 1);  // Next
+      indices.push_back(baseIndex);                                 // Center
+      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
+      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
     } else {
       // Ceiling - Reverse winding
       indices.push_back(baseIndex);          // Center
@@ -461,7 +461,7 @@ void WADConverter::createWallFace(const WAD::Vertex         &vertex1,
     wallHeight = wallTop - wallBottom;
   }
 
-  float wallLength = sqrt(pow(x2 - x1, 2) + pow(z2 - z1, 2));
+  float wallLength = sqrtf(powf(x2 - x1, 2.0f) + powf(z2 - z1, 2.0f));
 
   // Texture coordinates handling
   const float TEXTURE_WIDTH  = 64.0f;   // Standard DOOM texture width
@@ -472,7 +472,8 @@ void WADConverter::createWallFace(const WAD::Vertex         &vertex1,
   float vOffset = static_cast<float>(sidedef.y_offset);
 
   // Calculate vertex indices
-  unsigned int baseIndex = vertices.size() / 5;  // 5 floats per vertex
+  unsigned int baseIndex =
+      static_cast<unsigned int>(vertices.size() / 5);  // 5 floats per vertex
 
   // Calculate texture coordinates
   float u1 = uOffset / TEXTURE_WIDTH;
