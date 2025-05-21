@@ -148,8 +148,8 @@ public:
   // Convert WAD data to custom DSL format
   std::string toDSL() const;
 
-  Level       getLevel(std::string name) const;
-  std::string getLevelNameByIndex(size_t index) const;
+  Level       getLevel(const std::string &) const;
+  std::string getLevelNameByIndex(int index) const;
 
 private:
   bool                   verbose_;
@@ -162,8 +162,8 @@ private:
   std::vector<Level> levels_;
 
   // Method to read the WAD directory
-  void readDirectory();
-  bool isLevelMarker(const std::string &name) const;
+  void        readDirectory();
+  static bool isLevelMarker(const std::string &name);
 
   // Method to find a lump by name
   bool findLump(const std::string &name, uint32_t &offset, uint32_t &size,

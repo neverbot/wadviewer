@@ -39,7 +39,6 @@
 *.hex
 
 # cmake
-CMakePresets.txt
 CMakeUserPresets.json
 
 # build

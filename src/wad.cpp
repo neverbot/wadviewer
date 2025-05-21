@@ -62,10 +62,15 @@ void WAD::readDirectory() {
   // Read the entire directory into memory: each lump has a fixed-size record
   // (16 bytes), and we read all of them at once.
   file.read(reinterpret_cast<char *>(directory_.data()),
-            header_.numlumps * sizeof(Directory));
+            static_cast<std::streamsize>(header_.numlumps * sizeof(Directory)));
 }
 
-bool WAD::isLevelMarker(const std::string &name) const {
+/**
+ * @brief Check if a lump name is a level marker
+ * @param name Lump name
+ * @return true if the name is a level marker, false otherwise
+ */
+bool WAD::isLevelMarker(const std::string &name) {
   std::string cleanName = OkStrings::trimFixedString(name, 8);
 
   // DOOM 1 level names are ExMy (x = episode, y = mission)
@@ -131,7 +136,8 @@ std::vector<uint8_t> WAD::readLump(std::streamoff offset, std::size_t size) {
     throw std::runtime_error("Unable to open file: " + filepath_);
   }
   file.seekg(offset);
-  file.read(reinterpret_cast<char *>(data.data()), size);
+  file.read(reinterpret_cast<char *>(data.data()),
+            static_cast<std::streamsize>(size));
   return data;
 }
 
@@ -882,7 +888,7 @@ std::string WAD::toJSON() const {
  * @return Level object
  * @throws std::runtime_error if the level is not found
  */
-WAD::Level WAD::getLevel(std::string name) const {
+WAD::Level WAD::getLevel(const std::string &name) const {
   std::cout << "WAD :: Looking for level: '" << name << "'...";
 
   // Compare the first 8 characters of the name
@@ -902,10 +908,10 @@ WAD::Level WAD::getLevel(std::string name) const {
  * @return Name of the level
  * @throws std::out_of_range if the index is out of range
  */
-std::string WAD::getLevelNameByIndex(size_t index) const {
+std::string WAD::getLevelNameByIndex(int index) const {
   if (index < levels_.size()) {
     return std::string(levels_[index].name, strnlen(levels_[index].name, 8));
-  } else {
-    throw std::out_of_range("Index out of range");
   }
+
+  throw std::out_of_range("Index out of range");
 }
