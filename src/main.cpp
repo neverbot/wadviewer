@@ -324,8 +324,7 @@ int main(int argc, char *argv[]) {
                      std::string(level.name, strnlen(level.name, 8)));
 
       // Create level geometry using the converter
-      std::vector<OkItem *> levelItems =
-          WADConverter::createLevelGeometry(level);
+      std::vector<OkItem *> levelItems = WADConverter::convertLevel(level);
 
       // ************************************************************************
       // Secondary Camera

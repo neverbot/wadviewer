@@ -23,6 +23,22 @@ enum class WADFormat : std::uint8_t {
   DSL_VERBOSE
 };
 
+/**
+ * Class representing a WAD file. This class provides methods to read and
+ * process WAD files, extract level data, and convert it to various formats. The
+ * WAD format is used in classic games like DOOM. The class can read level
+ * geometry, textures, flats, and other game data from the WAD file. It can also
+ * convert the data to JSON or a custom DSL format. The class is designed to be
+ * used in a game engine or level editor to load and manipulate game levels. The
+ * WAD format is a binary file format used to store game data. It consists of a
+ * header, a directory of lumps, and the lump data itself. Each lump can contain
+ * various types of data, such as textures, level geometry, and more. The WAD
+ * class provides methods to read these lumps, extract their data, and convert
+ * them to a more usable format for rendering or editing. The class also
+ * supports verbose output for debugging and development purposes, allowing
+ * developers to see detailed information about the WAD file structure and
+ * contents.
+ */
 class WAD {
 public:
   // Constructor takes WAD file path
