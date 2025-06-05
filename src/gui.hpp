@@ -2,7 +2,6 @@
 #define WAD_VIEWER_GUI_HPP
 
 #include "../okinawa.cpp/src/core/camera.hpp"
-#include "../okinawa.cpp/src/handlers/textures.hpp"
 #include "../okinawa.cpp/src/input/input.hpp"
 #include "../okinawa.cpp/src/item/item.hpp"
 #include <string>

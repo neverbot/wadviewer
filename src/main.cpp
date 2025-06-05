@@ -206,6 +206,28 @@ void positionCameraForLevel(OkCamera                    *camera,
 int main(int argc, char *argv[]) {
   try {
     OkLogger::info("Main :: Starting up...");
+
+    // Display control instructions with ASCII frame
+    // clang-format off
+    OkLogger::info("╔══════════════════════════════════════════════════════════════╗");
+    OkLogger::info("║                        CONTROLS HELP                         ║");
+    OkLogger::info("╠══════════════════════════════════════════════════════════════╣");
+    OkLogger::info("║  TEXTURE VIEWER:                                             ║");
+    OkLogger::info("║    SPACE BAR  - Cycle through textures                       ║");
+    OkLogger::info("║    T          - Toggle texture viewer visibility             ║");
+    OkLogger::info("║                                                              ║");
+    OkLogger::info("║  CAMERAS:                                                    ║");
+    OkLogger::info("║    1          - Overview camera                              ║");
+    OkLogger::info("║    2          - Player start camera                          ║");
+    OkLogger::info("║    3          - Origin camera                                ║");
+    OkLogger::info("║                                                              ║");
+    OkLogger::info("║  MOVEMENT:                                                   ║");
+    OkLogger::info("║    W A S D    - Move forward/left/backward/right             ║");
+    OkLogger::info("║    MOUSE      - Look around                                  ║");
+    OkLogger::info("║    ESC        - Exit application                             ║");
+    OkLogger::info("╚══════════════════════════════════════════════════════════════╝");
+    // clang-format on
+
     OkCore::initialize();
 
     // Set initial camera
