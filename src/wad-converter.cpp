@@ -1,5 +1,6 @@
 #include "wad-converter.hpp"
 #include "wad-geometry.hpp"
+#include <algorithm>
 
 // Initialize static members
 float       WADConverter::centerX = 0.0f;
@@ -73,14 +74,11 @@ void WADConverter::calculateLevelBounds(const WAD::Level &level) {
 
   for (size_t i = 1; i < level.vertices.size(); i++) {
     const WAD::Vertex &vertex = level.vertices[i];
-    if (vertex.x < minX)
-      minX = vertex.x;
-    if (vertex.x > maxX)
-      maxX = vertex.x;
-    if (vertex.y < minY)
-      minY = vertex.y;
-    if (vertex.y > maxY)
-      maxY = vertex.y;
+
+    minX = std::min(minX, vertex.x);
+    maxX = std::max(maxX, vertex.x);
+    minY = std::min(minY, vertex.y);
+    maxY = std::max(maxY, vertex.y);
   }
 
   centerX = static_cast<float>(minX + maxX) / 2.0f;
@@ -102,6 +100,7 @@ std::vector<OkItem *> WADConverter::convertLevel(const WAD::Level &level) {
   std::vector<OkItem *> geometryItems = WADGeometry::createLevelGeometry(level);
 
   // Add all geometry items to the result
+  items.reserve(geometryItems.size());
   for (size_t i = 0; i < geometryItems.size(); i++) {
     items.push_back(geometryItems[i]);
   }
