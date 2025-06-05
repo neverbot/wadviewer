@@ -308,14 +308,48 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
       continue;
     }
 
-    std::string   itemName   = "level_" + group.textureName;
+    std::string itemName = "level_" + group.textureName;
+
+    // Calculate bounding box to find the geometric center
+    float minX = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float minY = std::numeric_limits<float>::max();
+    float maxY = std::numeric_limits<float>::lowest();
+    float minZ = std::numeric_limits<float>::max();
+    float maxZ = std::numeric_limits<float>::lowest();
+
+    // Find bounds (vertices are stored as [x, y, z, u, v])
+    for (size_t i = 0; i < group.vertices.size(); i += 5) {
+      float x = group.vertices[i];
+      float y = group.vertices[i + 1];
+      float z = group.vertices[i + 2];
+
+      minX = std::min(minX, x);
+      maxX = std::max(maxX, x);
+      minY = std::min(minY, y);
+      maxY = std::max(maxY, y);
+      minZ = std::min(minZ, z);
+      maxZ = std::max(maxZ, z);
+    }
+
+    // Calculate geometric center
+    float centerX = (minX + maxX) * 0.5f;
+    float centerY = (minY + maxY) * 0.5f;
+    float centerZ = (minZ + maxZ) * 0.5f;
+
     float        *vertexData = new float[group.vertices.size()];
     unsigned int *indexData  = new unsigned int[group.indices.size()];
 
-    // Copy vertex and index data
-    for (int i = 0; i < (int)group.vertices.size(); i++) {
-      vertexData[i] = group.vertices[i];
+    // Copy vertex data and translate to local coordinates (relative to center)
+    for (size_t i = 0; i < group.vertices.size(); i += 5) {
+      vertexData[i]     = group.vertices[i] - centerX;      // x - centerX
+      vertexData[i + 1] = group.vertices[i + 1] - centerY;  // y - centerY
+      vertexData[i + 2] = group.vertices[i + 2] - centerZ;  // z - centerZ
+      vertexData[i + 3] = group.vertices[i + 3];            // u (texture coord)
+      vertexData[i + 4] = group.vertices[i + 4];            // v (texture coord)
     }
+
+    // Copy index data unchanged
     for (int i = 0; i < (int)group.indices.size(); i++) {
       indexData[i] = group.indices[i];
     }
@@ -323,6 +357,9 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
     OkItem *item = new OkItem(
         itemName, vertexData, static_cast<long>(group.vertices.size()),
         indexData, static_cast<long>(group.indices.size()));
+
+    // Set the item's position to the calculated center
+    item->setPosition(centerX, centerY, centerZ);
 
     OkTexture *texture =
         OkTextureHandler::getInstance()->getTexture(group.textureName);
