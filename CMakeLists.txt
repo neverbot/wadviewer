@@ -49,7 +49,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(stb REQUIRED)
-find_package(OpenGL REQUIRED)
+find_package(opengl_system REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 # Add the okinawa.cpp library subdirectory
@@ -77,7 +77,7 @@ target_link_libraries(${PROJECT_NAME}
         glm::glm
         glfw
         stb::stb
-        OpenGL::GL
+        opengl::opengl
         nlohmann_json::nlohmann_json
 )
 
