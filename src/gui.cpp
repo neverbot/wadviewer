@@ -56,7 +56,7 @@ void GUI::step(const OkInputState &input) {
 }
 
 void GUI::toggleVisibility() {
-  texturePreview->setVisible(!texturePreview->isVisible());
+  texturePreview->setVisible(!texturePreview->getVisible());
 }
 
 void GUI::nextTexture() {

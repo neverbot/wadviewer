@@ -380,12 +380,14 @@ int main(int argc, char *argv[]) {
           new OkItem("cube", vertices.data(), static_cast<int>(vertices.size()),
                      indices.data(), static_cast<int>(indices.size()));
       item->setWireframe(true);
+      item->setDrawOriginAxis(true);
 
       item2 = new OkItem("cube2", vertices.data(),
                          static_cast<int>(vertices.size()), indices.data(),
                          static_cast<int>(indices.size()));
       item2->setWireframe(true);
       item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
+      item2->setDrawOriginAxis(true);
 
       scene->addItem(item);
       item2->attachTo(item);
@@ -397,7 +399,11 @@ int main(int argc, char *argv[]) {
 
       for (size_t i = 0; i < levelItems.size(); ++i) {
         levelItems[i]->setWireframe(false);
+        levelItems[i]->setDrawOriginAxis(true);
         scene->addItem(levelItems[i]);
+        OkLogger::info("Added item " + std::to_string(i) +
+                       " to scene at position: " +
+                       levelItems[i]->getPosition().toString());
       }
 
       // Position camera to view the entire level
