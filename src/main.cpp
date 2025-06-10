@@ -17,6 +17,9 @@ OkItem *item  = nullptr;
 OkItem *item2 = nullptr;
 GUI    *gui   = nullptr;
 
+// Global level groups for sector-based organization
+std::vector<OkItemGroup *> sectorGroups;
+
 /**
  * @brief callback function for the step phase of the engine loop.
  * @param deltaTime Time since the last frame in milliseconds.
@@ -137,10 +140,10 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
 /**
  * @brief Position the camera to view the level geometry.
  * @param camera The camera to position.
- * @param items Vector of level items.
+ * @param sectorGroups Vector of sector groups containing level geometry.
  */
-void positionCameraForLevel(OkCamera                    *camera,
-                            const std::vector<OkItem *> &items) {
+void positionCameraForLevel(OkCamera                         *camera,
+                            const std::vector<OkItemGroup *> &sectorGroups) {
   // Find level bounds
   float minX = std::numeric_limits<float>::max();
   float maxX = std::numeric_limits<float>::lowest();
@@ -149,15 +152,19 @@ void positionCameraForLevel(OkCamera                    *camera,
   float minZ = std::numeric_limits<float>::max();
   float maxZ = std::numeric_limits<float>::lowest();
 
-  for (size_t i = 0; i < items.size(); ++i) {
-    float   radius = items[i]->getRadius();
-    OkPoint pos    = items[i]->getPosition();
-    minX           = std::min(minX, pos.x() - radius);
-    maxX           = std::max(maxX, pos.x() + radius);
-    minY           = std::min(minY, pos.y() - radius);
-    maxY           = std::max(maxY, pos.y() + radius);
-    minZ           = std::min(minZ, pos.z() - radius);
-    maxZ           = std::max(maxZ, pos.z() + radius);
+  // Iterate through all sector groups and their items
+  for (size_t i = 0; i < sectorGroups.size(); ++i) {
+    std::vector<OkItem *> groupItems = sectorGroups[i]->getAllItems();
+    for (size_t j = 0; j < groupItems.size(); ++j) {
+      float   radius = groupItems[j]->getRadius();
+      OkPoint pos    = groupItems[j]->getPosition();
+      minX           = std::min(minX, pos.x() - radius);
+      maxX           = std::max(maxX, pos.x() + radius);
+      minY           = std::min(minY, pos.y() - radius);
+      maxY           = std::max(maxY, pos.y() + radius);
+      minZ           = std::min(minZ, pos.z() - radius);
+      maxZ           = std::max(maxZ, pos.z() + radius);
+    }
   }
 
   // Calculate level dimensions
@@ -324,7 +331,38 @@ int main(int argc, char *argv[]) {
                      std::string(level.name, strnlen(level.name, 8)));
 
       // Create level geometry using the converter
-      std::vector<OkItem *> levelItems = WADConverter::convertLevel(level);
+      sectorGroups = WADConverter::convertLevel(level);
+
+      // Add sector groups directly to the scene
+      for (size_t i = 0; i < sectorGroups.size(); i++) {
+        scene->addObject(sectorGroups[i]);
+        OkLogger::info("Added sector group " + std::to_string(i) + " (" +
+                       sectorGroups[i]->getName() + ") to scene at position: " +
+                       sectorGroups[i]->getPosition().toString());
+      }
+
+      // Log sector group information
+      OkLogger::info("Level converted to " +
+                     std::to_string(sectorGroups.size()) + " sector groups");
+
+      for (size_t i = 0; i < sectorGroups.size(); i++) {
+        OkItemGroup *group        = sectorGroups[i];
+        int          wallCount    = group->getItemCountWithTag("wall");
+        int          floorCount   = group->getItemCountWithTag("floor");
+        int          ceilingCount = group->getItemCountWithTag("ceiling");
+
+        OkLogger::info("Sector " + std::to_string(i) + " (" + group->getName() +
+                       "): " + std::to_string(group->getItemCount()) +
+                       " items - Walls: " + std::to_string(wallCount) +
+                       ", Floors: " + std::to_string(floorCount) +
+                       ", Ceilings: " + std::to_string(ceilingCount));
+
+        group->setDrawOriginAxisForAll(false);
+        group->setDrawOriginAxis(true);
+      }
+
+      // Position camera to view the entire level
+      positionCameraForLevel(camera, sectorGroups);
 
       // ************************************************************************
       // Secondary Camera
@@ -389,25 +427,13 @@ int main(int argc, char *argv[]) {
       item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
       item2->setDrawOriginAxis(true);
 
-      scene->addItem(item);
+      scene->addObject(item);
       item2->attachTo(item);
       // scene->addItem(item2);
       item->setPosition(-2.0f, 0.0f, -10.0f);  // Left square
       item2->setPosition(2.0f, 0.0f,
                          0.0f);  // Right square (will be relative to item)
       // ************************************************************************
-
-      for (size_t i = 0; i < levelItems.size(); ++i) {
-        levelItems[i]->setWireframe(false);
-        levelItems[i]->setDrawOriginAxis(true);
-        scene->addItem(levelItems[i]);
-        OkLogger::info("Added item " + std::to_string(i) +
-                       " to scene at position: " +
-                       levelItems[i]->getPosition().toString());
-      }
-
-      // Position camera to view the entire level
-      positionCameraForLevel(camera, levelItems);
 
     } catch (const std::exception &e) {
       std::cerr << "Error: " << e.what() << "\n";
@@ -421,8 +447,8 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
     // ******************************************************************************************
 
-    OkLogger::info("Scene :: Item count: " +
-                   std::to_string(scene->getItemCount()));
+    OkLogger::info("Scene :: Object count: " +
+                   std::to_string(scene->getObjectCount()));
 
     // Start game loop
     OkCore::loop(stepCallback, drawCallback);

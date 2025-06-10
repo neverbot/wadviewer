@@ -91,14 +91,15 @@ void WADConverter::calculateLevelBounds(const WAD::Level &level) {
 }
 
 /**
- * @brief Convert a WAD level to renderable geometry items.
+ * @brief Convert a WAD level to renderable geometry item groups.
  * @param level The WAD level to convert.
- * @return Vector of OkItem pointers representing the level geometry.
+ * @return Vector of OkItemGroup pointers representing the level geometry
+ * organized by sectors.
  */
-std::vector<OkItem *> WADConverter::convertLevel(const WAD::Level &level) {
+std::vector<OkItemGroup *> WADConverter::convertLevel(const WAD::Level &level) {
   // Calculate level bounds for centering
   calculateLevelBounds(level);
 
-  // Convert level geometry to renderable items and return directly
+  // Convert level geometry to renderable item groups and return directly
   return WADGeometry::createLevelGeometry(level);
 }

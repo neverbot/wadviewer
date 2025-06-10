@@ -1,6 +1,7 @@
 #ifndef WAD_VIEWER_WAD_CONVERTER_HPP
 #define WAD_VIEWER_WAD_CONVERTER_HPP
 
+#include "../okinawa.cpp/src/item/group.hpp"
 #include "../okinawa.cpp/src/item/item.hpp"
 #include "../okinawa.cpp/src/math/point.hpp"
 #include "./wad.hpp"
@@ -10,9 +11,9 @@ public:
   WADConverter()  = default;
   ~WADConverter() = default;
 
-  static std::vector<OkItem *> convertLevel(const WAD::Level &level);
-  static void                  processTextures(const WAD &wad);
-  static OkPoint              *getPlayerStartPosition(const WAD::Level &level);
+  static std::vector<OkItemGroup *> convertLevel(const WAD::Level &level);
+  static void                       processTextures(const WAD &wad);
+  static OkPoint *getPlayerStartPosition(const WAD::Level &level);
 
 private:
   static void calculateLevelBounds(const WAD::Level &level);

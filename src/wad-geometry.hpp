@@ -1,15 +1,27 @@
 #ifndef WAD_VIEWER_WAD_GEOMETRY_HPP
 #define WAD_VIEWER_WAD_GEOMETRY_HPP
 
+#include "../okinawa.cpp/src/item/group.hpp"
 #include "../okinawa.cpp/src/item/item.hpp"
 #include "./wad.hpp"
 #include <vector>
 
 class WADGeometry {
 public:
-  static std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
+  static std::vector<OkItemGroup *>
+  createLevelGeometry(const WAD::Level &level);
 
 private:
+  // Create individual sector group with all its geometry
+  static OkItemGroup *createSectorGroup(const WAD::Level       &level,
+                                        const WAD::Sector      &sector,
+                                        int                     sectorIndex,
+                                        const std::vector<int> &sectorVertices);
+
+  // Create walls for a specific sector
+  static std::vector<OkItem *>
+  createSectorWalls(const WAD::Level &level, const WAD::Sector &sector,
+                    int sectorIndex, const std::vector<int> &sectorVertices);
   static void createWallSection(const WAD::Vertex &vertex1,
                                 const WAD::Vertex &vertex2, float bottomHeight,
                                 float topHeight, const WAD::Sidedef &sidedef,

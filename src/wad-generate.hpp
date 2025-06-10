@@ -32,6 +32,15 @@ public:
                    const std::vector<std::vector<int>> &sectorVertices);
 
   /**
+   * @brief Generate vertices for a specific sector by analyzing linedefs.
+   * @param level The WAD level data
+   * @param sectorIndex The index of the sector to generate vertices for
+   * @return Vector of vertex indices for the sector
+   */
+  static std::vector<int> generateSectorVertices(const WAD::Level &level,
+                                                 int               sectorIndex);
+
+  /**
    * @brief Generate a single floor item for a specific sector.
    * @param level The WAD level data
    * @param sector The sector to generate floor for

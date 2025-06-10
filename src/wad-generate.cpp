@@ -335,3 +335,49 @@ void WADGenerate::calculateSectorCenter(const WAD::Level       &level,
   centerY = height;                 // Y is the height
   centerZ = -(minZ + maxZ) * 0.5f;  // Negate Z for proper coordinate system
 }
+
+std::vector<int> WADGenerate::generateSectorVertices(const WAD::Level &level,
+                                                     int sectorIndex) {
+  std::vector<int> sectorVertices;
+
+  // Iterate through all linedefs to find ones that reference this sector
+  for (size_t i = 0; i < level.linedefs.size(); i++) {
+    const WAD::Linedef &linedef = level.linedefs[i];
+
+    // Skip invalid vertex indices
+    if (linedef.start_vertex >= level.vertices.size() ||
+        linedef.end_vertex >= level.vertices.size()) {
+      continue;
+    }
+
+    // Check right side
+    if (linedef.right_sidedef != 0xFFFF &&
+        linedef.right_sidedef < level.sidedefs.size()) {
+      const WAD::Sidedef &rightSide = level.sidedefs[linedef.right_sidedef];
+
+      if (rightSide.sector == sectorIndex) {
+        sectorVertices.push_back(linedef.start_vertex);
+        sectorVertices.push_back(linedef.end_vertex);
+      }
+    }
+
+    // Check left side
+    if (linedef.left_sidedef != 0xFFFF &&
+        linedef.left_sidedef < level.sidedefs.size()) {
+      const WAD::Sidedef &leftSide = level.sidedefs[linedef.left_sidedef];
+
+      if (leftSide.sector == sectorIndex) {
+        sectorVertices.push_back(linedef.start_vertex);
+        sectorVertices.push_back(linedef.end_vertex);
+      }
+    }
+  }
+
+  // Remove duplicates and sort
+  std::sort(sectorVertices.begin(), sectorVertices.end());
+  sectorVertices.erase(
+      std::unique(sectorVertices.begin(), sectorVertices.end()),
+      sectorVertices.end());
+
+  return sectorVertices;
+}

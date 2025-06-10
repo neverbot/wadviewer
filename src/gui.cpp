@@ -26,7 +26,7 @@ GUI::GUI(OkCamera *camera) : currentTextureIndex(0) {
   texturePreview->attachTo(camera);
 
   // Position in front of the camera
-  texturePreview->setPosition(7.0f, -5.0f, -30.0f);
+  texturePreview->setPosition(10.0f, -7.0f, -30.0f);
 
   // Get available textures
   textureNames = OkTextureHandler::getInstance()->getTextureNames();
