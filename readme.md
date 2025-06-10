@@ -19,11 +19,23 @@ A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://g
 
 The executable will be created in `build/bin/wadviewer`.
 
+### Prerequisites
+
+The project depends on the Okinawa engine, which must be built and installed as a local Conan package first:
+
+```bash
+# Clone and create the Okinawa package
+git clone https://github.com/okinawa-dev/okinawa.cpp.git
+cd okinawa.cpp
+conan create . --build=missing
+cd ..
+```
+
 ### Debug Build
 
 ```bash
-# Clone the repository with submodules
-git clone --recursive https://github.com/yourusername/wadviewer.git
+# Clone the repository
+git clone https://github.com/yourusername/wadviewer.git
 cd wadviewer
 
 # Install dependencies using Conan
@@ -39,8 +51,8 @@ cmake --build --preset debug
 ### Release Build
 
 ```bash
-# Clone the repository with submodules
-git clone --recursive https://github.com/yourusername/wadviewer.git
+# Clone the repository (if not already done)
+git clone https://github.com/yourusername/wadviewer.git
 cd wadviewer
 
 # Install dependencies using Conan
@@ -92,13 +104,13 @@ Example:
   - `main.cpp`: Main application entry point.
   - `wad.hpp/cpp`: WAD file parsing and handling.
   - `wad-converter.hpp/cpp`: WAD to 3D geometry conversion.
-- `okinawa.cpp/`: Submodule containing the Okinawa game engine.
 - `wads/`: Example WAD files.
 
 ## Dependencies
 
 All dependencies are managed through Conan:
 
+- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (local package).
 - [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
 - [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
 - [nlohmann_json](https://github.com/nlohmann/json): JSON parsing.

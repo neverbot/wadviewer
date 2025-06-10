@@ -44,6 +44,7 @@ CMakeUserPresets.json
 # build
 .conan
 build/
+build-release/
 !build/.gitkeep
 
 # executable file

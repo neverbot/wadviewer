@@ -1,5 +1,5 @@
 #include "wad-converter.hpp"
-#include "../okinawa.cpp/src/config/config.hpp"
+#include "okinawa/config/config.hpp"
 #include "wad-geometry.hpp"
 #include <algorithm>
 

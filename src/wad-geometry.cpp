@@ -1,8 +1,8 @@
 #include "wad-geometry.hpp"
-#include "../okinawa.cpp/src/config/config.hpp"
-#include "../okinawa.cpp/src/handlers/textures.hpp"
-#include "../okinawa.cpp/src/utils/logger.hpp"
-#include "../okinawa.cpp/src/utils/strings.hpp"
+#include "okinawa/config/config.hpp"
+#include "okinawa/handlers/textures.hpp"
+#include "okinawa/utils/logger.hpp"
+#include "okinawa/utils/strings.hpp"
 #include "wad-generate.hpp"
 #include "wad-textures.hpp"
 #include <cmath>

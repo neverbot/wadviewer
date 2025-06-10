@@ -1,9 +1,9 @@
 #ifndef WAD_VIEWER_WAD_GEOMETRY_HPP
 #define WAD_VIEWER_WAD_GEOMETRY_HPP
 
-#include "../okinawa.cpp/src/item/group.hpp"
-#include "../okinawa.cpp/src/item/item.hpp"
 #include "./wad.hpp"
+#include "okinawa/item/group.hpp"
+#include "okinawa/item/item.hpp"
 #include <vector>
 
 class WADGeometry {

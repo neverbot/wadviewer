@@ -1,11 +1,11 @@
-#include "../okinawa.cpp/src/config/config.hpp"
-#include "../okinawa.cpp/src/core/camera.hpp"
-#include "../okinawa.cpp/src/core/core.hpp"
-#include "../okinawa.cpp/src/handlers/scenes.hpp"
-#include "../okinawa.cpp/src/input/input.hpp"
-#include "../okinawa.cpp/src/math/math.hpp"
-#include "../okinawa.cpp/src/scene/scene.hpp"
-#include "../okinawa.cpp/src/utils/logger.hpp"
+#include "okinawa/config/config.hpp"
+#include "okinawa/core/camera.hpp"
+#include "okinawa/core/core.hpp"
+#include "okinawa/handlers/scenes.hpp"
+#include "okinawa/input/input.hpp"
+#include "okinawa/math/math.hpp"
+#include "okinawa/scene/scene.hpp"
+#include "okinawa/utils/logger.hpp"
 #include <cmath>
 #include <iostream>
 

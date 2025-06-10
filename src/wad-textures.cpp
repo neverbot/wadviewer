@@ -1,7 +1,7 @@
 #include "wad-textures.hpp"
-#include "../okinawa.cpp/src/handlers/textures.hpp"
-#include "../okinawa.cpp/src/utils/logger.hpp"
-#include "../okinawa.cpp/src/utils/strings.hpp"
+#include "okinawa/handlers/textures.hpp"
+#include "okinawa/utils/logger.hpp"
+#include "okinawa/utils/strings.hpp"
 
 /**
  * @brief Process all textures in a WAD level.

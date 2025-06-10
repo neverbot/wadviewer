@@ -1,9 +1,9 @@
 #ifndef WAD_VIEWER_WAD_CONVERTER_HPP
 #define WAD_VIEWER_WAD_CONVERTER_HPP
 
-#include "../okinawa.cpp/src/item/group.hpp"
-#include "../okinawa.cpp/src/math/point.hpp"
 #include "./wad.hpp"
+#include "okinawa/item/group.hpp"
+#include "okinawa/math/point.hpp"
 
 class WADConverter {
 public:

@@ -1,5 +1,5 @@
 #include "wad.hpp"
-#include "../okinawa.cpp/src/utils/strings.hpp"
+#include "okinawa/utils/strings.hpp"
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>

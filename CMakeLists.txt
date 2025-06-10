@@ -71,7 +71,7 @@ target_include_directories(${PROJECT_NAME}
 # Link libraries to the executable target
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        okinawa::okinawa_lib
+        okinawa::okinawa
         glm::glm
         glfw
         stb::stb

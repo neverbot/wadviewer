@@ -1,5 +1,5 @@
 #include "gui.hpp"
-#include "../okinawa.cpp/src/utils/logger.hpp"
+#include "okinawa/utils/logger.hpp"
 
 GUI::GUI(OkCamera *camera) {
   // Initialize member variables

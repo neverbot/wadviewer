@@ -1,7 +1,7 @@
 #ifndef WAD_GENERATE_HPP
 #define WAD_GENERATE_HPP
 
-#include "../okinawa.cpp/src/item/item.hpp"
+#include "okinawa/item/item.hpp"
 #include "wad.hpp"
 #include <vector>
 
