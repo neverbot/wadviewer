@@ -1,43 +1,12 @@
+# clangd configuration for okinawa.cpp standalone project
 CompileFlags:
   CompilationDatabase: build
   Add:
-    # Conan include paths for main project (from compile_commands.json)
-    - -isystem
-    - .conan/p/glmee168c829b0e6/p/include
-    - -isystem
-    - .conan/p/b/glfw676e270ff2228/p/include
-    - -isystem
-    - .conan/p/stb19b77fb56ffd7/p/include
-    - -isystem
-    - .conan/p/nlohm0567ffc90cfc1/p/include
-    # Okinawa project Conan include paths for Catch2
-    - -isystem
-    - okinawa.cpp/.conan/p/b/catch9f015f6633fdc/p/include
-    # Project source directories
-    - -Isrc
-    - -Iokinawa.cpp/src
-    - -Iokinawa.cpp/tests
-    # Standard flags
-    - -std=c++17
+    # Platform-specific flags for better diagnostics
+    - -stdlib=libc++
     - -DGL_SILENCE_DEPRECATION=1
     - -DSTB_TEXTEDIT_KEYTYPE=unsigned
-    - -Wall
-    - -Wextra
-  Remove:
-    # Remove any problematic flags that might interfere
-    - -Wno-unknown-warning-option
 
 Diagnostics:
   UnusedIncludes: Strict
   MissingIncludes: Strict
-
-InlayHints:
-  Enabled: true
-  ParameterNames: true
-  DeducedTypes: true
-
-Hover:
-  ShowAKA: true
-
-Index:
-  Background: Build
