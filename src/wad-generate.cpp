@@ -1,0 +1,326 @@
+#include "wad-generate.hpp"
+#include "../okinawa.cpp/src/handlers/textures.hpp"
+#include "../okinawa.cpp/src/utils/logger.hpp"
+#include "../okinawa.cpp/src/utils/strings.hpp"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+// Initialize constants
+const float WADGenerate::SCALE        = 1.0f;
+const float WADGenerate::TEXTURE_SIZE = 64.0f;  // DOOM uses 64x64 flat textures
+
+std::vector<OkItem *> WADGenerate::generateFloors(
+    const WAD::Level                    &level,
+    const std::vector<std::vector<int>> &sectorVertices) {
+
+  std::vector<OkItem *> floorItems;
+
+  for (size_t i = 0; i < level.sectors.size(); i++) {
+    if (i >= sectorVertices.size()) {
+      continue;
+    }
+
+    const WAD::Sector &sector = level.sectors[i];
+    OkItem *floorItem = generateSectorFloor(level, sector, sectorVertices[i],
+                                            static_cast<int>(i));
+
+    if (floorItem) {
+      floorItems.push_back(floorItem);
+    }
+  }
+
+  return floorItems;
+}
+
+std::vector<OkItem *> WADGenerate::generateCeilings(
+    const WAD::Level                    &level,
+    const std::vector<std::vector<int>> &sectorVertices) {
+
+  std::vector<OkItem *> ceilingItems;
+
+  for (size_t i = 0; i < level.sectors.size(); i++) {
+    if (i >= sectorVertices.size()) {
+      continue;
+    }
+
+    const WAD::Sector &sector      = level.sectors[i];
+    OkItem            *ceilingItem = generateSectorCeiling(
+        level, sector, sectorVertices[i], static_cast<int>(i));
+
+    if (ceilingItem) {
+      ceilingItems.push_back(ceilingItem);
+    }
+  }
+
+  return ceilingItems;
+}
+
+OkItem *WADGenerate::generateSectorFloor(const WAD::Level       &level,
+                                         const WAD::Sector      &sector,
+                                         const std::vector<int> &sectorVertices,
+                                         int                     sectorIndex) {
+
+  // Check if sector has valid floor texture
+  std::string floorTexName =
+      OkStrings::trimFixedString(sector.floor_texture, 8);
+  if (floorTexName.empty() || floorTexName == "-") {
+    return nullptr;
+  }
+
+  // Check if we have enough vertices
+  if (sectorVertices.size() < 3) {
+    return nullptr;
+  }
+
+  std::vector<float>        vertices;
+  std::vector<unsigned int> indices;
+
+  // Create geometry for this floor
+  createSectorGeometry(level, sector, sectorVertices, true, vertices, indices);
+
+  if (vertices.empty() || indices.empty()) {
+    return nullptr;
+  }
+
+  // Calculate the geometric center for positioning
+  float centerX, centerY, centerZ;
+  float height = static_cast<float>(sector.floor_height) * SCALE;
+  calculateSectorCenter(level, sectorVertices, height, centerX, centerY,
+                        centerZ);
+
+  // Convert to local coordinates (relative to center)
+  for (size_t i = 0; i < vertices.size(); i += 5) {
+    vertices[i] -= centerX;      // x - centerX
+    vertices[i + 1] -= centerY;  // y - centerY
+    vertices[i + 2] -= centerZ;  // z - centerZ
+    // vertices[i + 3] and vertices[i + 4] are texture coords, leave unchanged
+  }
+
+  // Create vertex and index arrays for OkItem
+  float        *vertexData = new float[vertices.size()];
+  unsigned int *indexData  = new unsigned int[indices.size()];
+
+  for (size_t i = 0; i < vertices.size(); i++) {
+    vertexData[i] = vertices[i];
+  }
+  for (size_t i = 0; i < indices.size(); i++) {
+    indexData[i] = indices[i];
+  }
+
+  // Create the item
+  std::string itemName =
+      "floor_sector_" + std::to_string(sectorIndex) + "_" + floorTexName;
+  OkItem *item =
+      new OkItem(itemName, vertexData, static_cast<long>(vertices.size()),
+                 indexData, static_cast<long>(indices.size()));
+
+  // Set the item's position to the calculated center
+  item->setPosition(centerX, centerY, centerZ);
+
+  // Try to assign texture
+  OkTexture *texture =
+      OkTextureHandler::getInstance()->getTexture(floorTexName);
+  if (texture) {
+    item->setTexture(floorTexName, texture);
+    OkLogger::info("Generated floor item '" + itemName + "' with texture '" +
+                   floorTexName + "'");
+  } else {
+    OkLogger::warning("Could not find texture '" + floorTexName +
+                      "' for floor item '" + itemName + "'");
+  }
+
+  return item;
+}
+
+OkItem *WADGenerate::generateSectorCeiling(
+    const WAD::Level &level, const WAD::Sector &sector,
+    const std::vector<int> &sectorVertices, int sectorIndex) {
+
+  // Check if sector has valid ceiling texture
+  std::string ceilingTexName =
+      OkStrings::trimFixedString(sector.ceiling_texture, 8);
+  if (ceilingTexName.empty() || ceilingTexName == "-") {
+    return nullptr;
+  }
+
+  // Check if we have enough vertices
+  if (sectorVertices.size() < 3) {
+    return nullptr;
+  }
+
+  std::vector<float>        vertices;
+  std::vector<unsigned int> indices;
+
+  // Create geometry for this ceiling
+  createSectorGeometry(level, sector, sectorVertices, false, vertices, indices);
+
+  if (vertices.empty() || indices.empty()) {
+    return nullptr;
+  }
+
+  // Calculate the geometric center for positioning
+  float centerX, centerY, centerZ;
+  float height = static_cast<float>(sector.ceiling_height) * SCALE;
+  calculateSectorCenter(level, sectorVertices, height, centerX, centerY,
+                        centerZ);
+
+  // Convert to local coordinates (relative to center)
+  for (size_t i = 0; i < vertices.size(); i += 5) {
+    vertices[i] -= centerX;      // x - centerX
+    vertices[i + 1] -= centerY;  // y - centerY
+    vertices[i + 2] -= centerZ;  // z - centerZ
+    // vertices[i + 3] and vertices[i + 4] are texture coords, leave unchanged
+  }
+
+  // Create vertex and index arrays for OkItem
+  float        *vertexData = new float[vertices.size()];
+  unsigned int *indexData  = new unsigned int[indices.size()];
+
+  for (size_t i = 0; i < vertices.size(); i++) {
+    vertexData[i] = vertices[i];
+  }
+  for (size_t i = 0; i < indices.size(); i++) {
+    indexData[i] = indices[i];
+  }
+
+  // Create the item
+  std::string itemName =
+      "ceiling_sector_" + std::to_string(sectorIndex) + "_" + ceilingTexName;
+  OkItem *item =
+      new OkItem(itemName, vertexData, static_cast<long>(vertices.size()),
+                 indexData, static_cast<long>(indices.size()));
+
+  // Set the item's position to the calculated center
+  item->setPosition(centerX, centerY, centerZ);
+
+  // Try to assign texture
+  OkTexture *texture =
+      OkTextureHandler::getInstance()->getTexture(ceilingTexName);
+  if (texture) {
+    item->setTexture(ceilingTexName, texture);
+    OkLogger::info("Generated ceiling item '" + itemName + "' with texture '" +
+                   ceilingTexName + "'");
+  } else {
+    OkLogger::warning("Could not find texture '" + ceilingTexName +
+                      "' for ceiling item '" + itemName + "'");
+  }
+
+  return item;
+}
+
+void WADGenerate::createSectorGeometry(const WAD::Level       &level,
+                                       const WAD::Sector      &sector,
+                                       const std::vector<int> &sectorVertices,
+                                       bool                    isFloor,
+                                       std::vector<float>     &vertices,
+                                       std::vector<unsigned int> &indices) {
+
+  if (sectorVertices.size() < 3) {
+    return;  // Need at least 3 vertices to form a polygon
+  }
+
+  float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
+                         : static_cast<float>(sector.ceiling_height) * SCALE;
+
+  // Calculate sector bounds for texture mapping
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+
+  // First pass - get bounds for texture coordinates
+  for (size_t i = 0; i < sectorVertices.size(); i++) {
+    if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
+      continue;  // Skip invalid vertex indices
+    }
+
+    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+    float              worldX = static_cast<float>(vertex.x);
+    float              worldY = static_cast<float>(vertex.y);
+
+    minX = std::min(minX, worldX);
+    maxX = std::max(maxX, worldX);
+    minY = std::min(minY, worldY);
+    maxY = std::max(maxY, worldY);
+  }
+
+  // Create vertices with proper texture coordinates
+  unsigned int baseIndex = 0;  // Start from 0 since this is a new item
+
+  for (size_t i = 0; i < sectorVertices.size(); i++) {
+    if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
+      continue;  // Skip invalid vertex indices
+    }
+
+    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+    float              x      = static_cast<float>(vertex.x) * SCALE;
+    float              z      = static_cast<float>(vertex.y) * SCALE;
+
+    // Calculate UV coordinates based on world position
+    float u = fmod((static_cast<float>(vertex.x) - minX) / TEXTURE_SIZE, 1.0f);
+    float v = fmod((static_cast<float>(vertex.y) - minY) / TEXTURE_SIZE, 1.0f);
+
+    if (!isFloor) {
+      v = 1.0f - v;  // Flip V coordinate for ceiling
+    }
+
+    vertices.push_back(x);
+    vertices.push_back(height);
+    vertices.push_back(-z);  // Negate Z for proper coordinate system
+    vertices.push_back(u);
+    vertices.push_back(v);
+  }
+
+  // Create triangles using a simple triangle fan
+  for (size_t i = 1; i < sectorVertices.size() - 1; i++) {
+    if (isFloor) {
+      // Floor - CCW winding
+      indices.push_back(baseIndex);                                 // Center
+      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
+      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
+    } else {
+      // Ceiling - Reverse winding
+      indices.push_back(baseIndex);  // Center
+      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
+      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
+    }
+  }
+}
+
+void WADGenerate::calculateSectorCenter(const WAD::Level       &level,
+                                        const std::vector<int> &sectorVertices,
+                                        float height, float &centerX,
+                                        float &centerY, float &centerZ) {
+
+  if (sectorVertices.empty()) {
+    centerX = centerY = centerZ = 0.0f;
+    return;
+  }
+
+  float minX = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float minZ = std::numeric_limits<float>::max();
+  float maxZ = std::numeric_limits<float>::lowest();
+
+  // Calculate bounds
+  for (size_t i = 0; i < sectorVertices.size(); i++) {
+    if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
+      continue;  // Skip invalid vertex indices
+    }
+
+    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+    float              x      = static_cast<float>(vertex.x) * SCALE;
+    float z = static_cast<float>(vertex.y) * SCALE;  // Note: WAD Y becomes Z
+
+    minX = std::min(minX, x);
+    maxX = std::max(maxX, x);
+    minZ = std::min(minZ, z);
+    maxZ = std::max(maxZ, z);
+  }
+
+  // Calculate center
+  centerX = (minX + maxX) * 0.5f;
+  centerY = height;                 // Y is the height
+  centerZ = -(minZ + maxZ) * 0.5f;  // Negate Z for proper coordinate system
+}

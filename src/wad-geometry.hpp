@@ -20,13 +20,6 @@ private:
                                 std::vector<float>        &vertices,
                                 std::vector<unsigned int> &indices);
 
-  static void createSectorGeometry(const WAD::Level          &level,
-                                   const WAD::Sector         &sector,
-                                   const std::vector<int>    &sectorVertices,
-                                   std::vector<float>        &vertices,
-                                   std::vector<unsigned int> &indices,
-                                   bool                       isFloor);
-
   static void
   createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
                  const WAD::Sector &sector1, const WAD::Sector &sector2,

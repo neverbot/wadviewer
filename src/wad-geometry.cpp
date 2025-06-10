@@ -2,6 +2,7 @@
 #include "../okinawa.cpp/src/handlers/textures.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include "../okinawa.cpp/src/utils/strings.hpp"
+#include "wad-generate.hpp"
 #include "wad-textures.hpp"
 #include <cmath>
 #include <limits>
@@ -267,35 +268,30 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
     }
   }
 
-  // Second pass: create floor and ceiling geometry for each sector
+  // Process sector vertices (remove duplicates)
   for (size_t i = 0; i < level.sectors.size(); i++) {
-    const WAD::Sector &sector = level.sectors[i];
-
     // Remove duplicate vertices
     std::sort(sectorVertices[i].begin(), sectorVertices[i].end());
     sectorVertices[i].erase(
         std::unique(sectorVertices[i].begin(), sectorVertices[i].end()),
         sectorVertices[i].end());
+  }
 
-    // Create floor
-    std::string floorTexName =
-        OkStrings::trimFixedString(sector.floor_texture, 8);
-    if (!floorTexName.empty() && floorTexName != "-") {
-      GeometryGroup &group = geometryGroups[floorTexName];
-      group.textureName    = floorTexName;
-      createSectorGeometry(level, sector, sectorVertices[i], group.vertices,
-                           group.indices, true);
-    }
+  // Second pass: create floor and ceiling geometry for each sector
+  std::vector<OkItem *> floorItems =
+      WADGenerate::generateFloors(level, sectorVertices);
+  std::vector<OkItem *> ceilingItems =
+      WADGenerate::generateCeilings(level, sectorVertices);
 
-    // Create ceiling
-    std::string ceilingTexName =
-        OkStrings::trimFixedString(sector.ceiling_texture, 8);
-    if (!ceilingTexName.empty() && ceilingTexName != "-") {
-      GeometryGroup &group = geometryGroups[ceilingTexName];
-      group.textureName    = ceilingTexName;
-      createSectorGeometry(level, sector, sectorVertices[i], group.vertices,
-                           group.indices, false);
-    }
+  // Pre-allocate space for better performance
+  items.reserve(items.size() + floorItems.size() + ceilingItems.size());
+
+  // Add floor and ceiling items to the result
+  for (size_t i = 0; i < floorItems.size(); i++) {
+    items.push_back(floorItems[i]);
+  }
+  for (size_t i = 0; i < ceilingItems.size(); i++) {
+    items.push_back(ceilingItems[i]);
   }
 
   // Create OkItems from geometry groups
@@ -376,79 +372,6 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
   }
 
   return items;
-}
-
-void WADGeometry::createSectorGeometry(const WAD::Level       &level,
-                                       const WAD::Sector      &sector,
-                                       const std::vector<int> &sectorVertices,
-                                       std::vector<float>     &vertices,
-                                       std::vector<unsigned int> &indices,
-                                       bool                       isFloor) {
-
-  if (sectorVertices.size() < 3) {
-    return;  // Need at least 3 vertices to form a polygon
-  }
-
-  float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
-                         : static_cast<float>(sector.ceiling_height) * SCALE;
-
-  // First create all vertices for the sector
-  unsigned int baseIndex    = vertices.size() / 5;  // 5 floats per vertex
-  const float  TEXTURE_SIZE = 64.0f;  // DOOM uses 64x64 flat textures
-
-  // Calculate sector bounds for texture mapping
-  float minX = std::numeric_limits<float>::max();
-  float minY = std::numeric_limits<float>::max();
-  float maxX = std::numeric_limits<float>::lowest();
-  float maxY = std::numeric_limits<float>::lowest();
-
-  // First pass - get bounds for texture coordinates
-  for (size_t i = 0; i < sectorVertices.size(); i++) {
-    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    float              worldX = static_cast<float>(vertex.x);
-    float              worldY = static_cast<float>(vertex.y);
-
-    minX = std::min(minX, worldX);
-    maxX = std::max(maxX, worldX);
-    minY = std::min(minY, worldY);
-    maxY = std::max(maxY, worldY);
-  }
-
-  // Create vertices with proper texture coordinates
-  for (int i = 0; i < (int)sectorVertices.size(); i++) {
-    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    float              x = (static_cast<float>(vertex.x) - centerX) * SCALE;
-    float              z = (static_cast<float>(vertex.y) - centerY) * SCALE;
-
-    // Calculate UV coordinates based on world position
-    float u = fmod((static_cast<float>(vertex.x) - minX) / TEXTURE_SIZE, 1.0f);
-    float v = fmod((static_cast<float>(vertex.y) - minY) / TEXTURE_SIZE, 1.0f);
-
-    if (!isFloor) {
-      v = 1.0f - v;  // Flip V coordinate for ceiling
-    }
-
-    vertices.push_back(x);
-    vertices.push_back(height);
-    vertices.push_back(-z);
-    vertices.push_back(u);
-    vertices.push_back(v);
-  }
-
-  // Create triangles using a simple triangle fan
-  for (size_t i = 1; i < sectorVertices.size() - 1; i++) {
-    if (isFloor) {
-      // Floor - CCW winding
-      indices.push_back(baseIndex);                                 // Center
-      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
-      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
-    } else {
-      // Ceiling - Reverse winding
-      indices.push_back(baseIndex);          // Center
-      indices.push_back(baseIndex + i + 1);  // Next
-      indices.push_back(baseIndex + i);      // Current
-    }
-  }
 }
 
 /**
