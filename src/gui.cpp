@@ -1,7 +1,10 @@
 #include "gui.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 
-GUI::GUI(OkCamera *camera) : currentTextureIndex(0) {
+GUI::GUI(OkCamera *camera) {
+  // Initialize member variables
+  currentTextureIndex = 0;
+
   // Create texture preview square
   std::vector<float> squareVerts = {
       // Position (XYZ)    // Texture coords (UV)

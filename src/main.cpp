@@ -40,6 +40,36 @@ void stepCallback(float deltaTime) {
     gui->step(state);
   }
 
+  // Toggle ceiling and floor visibility for all sectors
+  static bool lastAction1State = false;
+  if (state.action3 && !lastAction1State) {
+    // Toggle visibility for ceiling and floor items in all sectors
+    bool ceilingsFloorsVisible =
+        OkConfig::getBool("viewer.ceilings-floors-visible");
+    ceilingsFloorsVisible = !ceilingsFloorsVisible;
+    OkConfig::setBool("viewer.ceilings-floors-visible", ceilingsFloorsVisible);
+
+    for (size_t i = 0; i < sectorGroups.size(); i++) {
+      // Get ceiling items and toggle visibility
+      std::vector<OkItem *> ceilingItems =
+          sectorGroups[i]->getItemsWithTag("ceiling");
+      for (size_t j = 0; j < ceilingItems.size(); j++) {
+        ceilingItems[j]->setVisible(ceilingsFloorsVisible);
+      }
+
+      // Get floor items and toggle visibility
+      std::vector<OkItem *> floorItems =
+          sectorGroups[i]->getItemsWithTag("floor");
+      for (size_t j = 0; j < floorItems.size(); j++) {
+        floorItems[j]->setVisible(ceilingsFloorsVisible);
+      }
+    }
+
+    OkLogger::info("Ceiling/Floor visibility toggled: " +
+                   std::string(ceilingsFloorsVisible ? "ON" : "OFF"));
+  }
+  lastAction1State = state.action3;
+
   OkPoint forward = camera->getRotation().getForwardVector();
   OkPoint right   = camera->getRotation().getRightVector();
   OkPoint direction(0.0f, 0.0f, 0.0f);
@@ -222,6 +252,7 @@ int main(int argc, char *argv[]) {
     OkLogger::info("║  TEXTURE VIEWER:                                             ║");
     OkLogger::info("║    SPACE BAR  - Cycle through textures                       ║");
     OkLogger::info("║    T          - Toggle texture viewer visibility             ║");
+    OkLogger::info("║    R          - Toggle ceiling/floor visibility              ║");
     OkLogger::info("║                                                              ║");
     OkLogger::info("║  CAMERAS:                                                    ║");
     OkLogger::info("║    1          - Overview camera                              ║");
@@ -236,6 +267,9 @@ int main(int argc, char *argv[]) {
     // clang-format on
 
     OkCore::initialize();
+
+    // Initialize wadviewer-specific config values
+    OkConfig::setBool("viewer.ceilings-floors-visible", true);
 
     // Set initial camera
     OkCamera  *camera = OkCore::getCamera();
