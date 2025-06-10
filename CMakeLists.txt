@@ -46,14 +46,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find dependencies (Conan 2.x style)
+find_package(okinawa REQUIRED)
 find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(stb REQUIRED)
 find_package(opengl_system REQUIRED)
 find_package(nlohmann_json REQUIRED)
-
-# Add the okinawa.cpp library subdirectory
-add_subdirectory(okinawa.cpp)
 
 # Source files for wadviewer
 file(GLOB_RECURSE PROJECT_SOURCES 
@@ -73,7 +71,7 @@ target_include_directories(${PROJECT_NAME}
 # Link libraries to the executable target
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        okinawa_lib
+        okinawa::okinawa_lib
         glm::glm
         glfw
         stb::stb
