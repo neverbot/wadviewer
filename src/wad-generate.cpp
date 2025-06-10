@@ -1,4 +1,5 @@
 #include "wad-generate.hpp"
+#include "../okinawa.cpp/src/config/config.hpp"
 #include "../okinawa.cpp/src/handlers/textures.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include "../okinawa.cpp/src/utils/strings.hpp"
@@ -220,6 +221,10 @@ void WADGenerate::createSectorGeometry(const WAD::Level       &level,
     return;  // Need at least 3 vertices to form a polygon
   }
 
+  // Get level center coordinates from global config
+  float levelCenterX = OkConfig::getFloat("level.center.x");
+  float levelCenterY = OkConfig::getFloat("level.center.y");
+
   float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
                          : static_cast<float>(sector.ceiling_height) * SCALE;
 
@@ -254,8 +259,9 @@ void WADGenerate::createSectorGeometry(const WAD::Level       &level,
     }
 
     const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    float              x      = static_cast<float>(vertex.x) * SCALE;
-    float              z      = static_cast<float>(vertex.y) * SCALE;
+    // Apply the same coordinate transformation as walls
+    float x = (static_cast<float>(vertex.x) - levelCenterX) * SCALE;
+    float z = (static_cast<float>(vertex.y) - levelCenterY) * SCALE;
 
     // Calculate UV coordinates based on world position
     float u = fmod((static_cast<float>(vertex.x) - minX) / TEXTURE_SIZE, 1.0f);
@@ -298,20 +304,25 @@ void WADGenerate::calculateSectorCenter(const WAD::Level       &level,
     return;
   }
 
+  // Get level center coordinates from global config
+  float levelCenterX = OkConfig::getFloat("level.center.x");
+  float levelCenterY = OkConfig::getFloat("level.center.y");
+
   float minX = std::numeric_limits<float>::max();
   float maxX = std::numeric_limits<float>::lowest();
   float minZ = std::numeric_limits<float>::max();
   float maxZ = std::numeric_limits<float>::lowest();
 
-  // Calculate bounds
+  // Calculate bounds using same coordinate transformation as walls
   for (size_t i = 0; i < sectorVertices.size(); i++) {
     if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
       continue;  // Skip invalid vertex indices
     }
 
     const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    float              x      = static_cast<float>(vertex.x) * SCALE;
-    float z = static_cast<float>(vertex.y) * SCALE;  // Note: WAD Y becomes Z
+    // Apply the same coordinate transformation as walls
+    float x = (static_cast<float>(vertex.x) - levelCenterX) * SCALE;
+    float z = (static_cast<float>(vertex.y) - levelCenterY) * SCALE;
 
     minX = std::min(minX, x);
     maxX = std::max(maxX, x);

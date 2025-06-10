@@ -1,11 +1,7 @@
 #include "wad-converter.hpp"
+#include "../okinawa.cpp/src/config/config.hpp"
 #include "wad-geometry.hpp"
 #include <algorithm>
-
-// Initialize static members
-float       WADConverter::centerX = 0.0f;
-float       WADConverter::centerY = 0.0f;
-const float WADConverter::SCALE   = 1.0f;
 
 /**
  * @brief Get the player's starting position in the level as a 3D point.
@@ -19,9 +15,14 @@ OkPoint *WADConverter::getPlayerStartPosition(const WAD::Level &level) {
   if (!level.has_player_start)
     return nullptr;
 
+  // Get level center coordinates from global config
+  float       levelCenterX = OkConfig::getFloat("level.center.x");
+  float       levelCenterY = OkConfig::getFloat("level.center.y");
+  const float SCALE        = 1.0f;
+
   // Convert DOOM coordinates to our coordinate system
-  float x = (static_cast<float>(level.player_start.x) - centerX) * SCALE;
-  float z = (static_cast<float>(level.player_start.y) - centerY) * SCALE;
+  float x = (static_cast<float>(level.player_start.x) - levelCenterX) * SCALE;
+  float z = (static_cast<float>(level.player_start.y) - levelCenterY) * SCALE;
 
   // Find the sector the player is in to get the floor height
   float floorHeight = 0.0f;
@@ -62,8 +63,8 @@ OkPoint *WADConverter::getPlayerStartPosition(const WAD::Level &level) {
  */
 void WADConverter::calculateLevelBounds(const WAD::Level &level) {
   if (level.vertices.empty()) {
-    centerX = 0.0f;
-    centerY = 0.0f;
+    OkConfig::setFloat("level.center.x", 0.0f);
+    OkConfig::setFloat("level.center.y", 0.0f);
     return;
   }
 
@@ -81,8 +82,12 @@ void WADConverter::calculateLevelBounds(const WAD::Level &level) {
     maxY = std::max(maxY, vertex.y);
   }
 
-  centerX = static_cast<float>(minX + maxX) / 2.0f;
-  centerY = static_cast<float>(minY + maxY) / 2.0f;
+  float levelCenterX = static_cast<float>(minX + maxX) / 2.0f;
+  float levelCenterY = static_cast<float>(minY + maxY) / 2.0f;
+
+  // Store level center coordinates in global config
+  OkConfig::setFloat("level.center.x", levelCenterX);
+  OkConfig::setFloat("level.center.y", levelCenterY);
 }
 
 /**

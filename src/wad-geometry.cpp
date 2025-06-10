@@ -1,4 +1,5 @@
 #include "wad-geometry.hpp"
+#include "../okinawa.cpp/src/config/config.hpp"
 #include "../okinawa.cpp/src/handlers/textures.hpp"
 #include "../okinawa.cpp/src/utils/logger.hpp"
 #include "../okinawa.cpp/src/utils/strings.hpp"
@@ -7,22 +8,22 @@
 #include <cmath>
 #include <limits>
 
-// Initialize static members
-float       WADGeometry::centerX = 0.0f;
-float       WADGeometry::centerY = 0.0f;
-const float WADGeometry::SCALE   = 1.0f;
-
 void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
                                     const WAD::Vertex &vertex2,
                                     float bottomHeight, float topHeight,
                                     const WAD::Sidedef        &sidedef,
                                     std::vector<float>        &vertices,
                                     std::vector<unsigned int> &indices) {
+  // Get level center coordinates from global config
+  float       levelCenterX = OkConfig::getFloat("level.center.x");
+  float       levelCenterY = OkConfig::getFloat("level.center.y");
+  const float SCALE        = 1.0f;
+
   // Calculate normalized positions
-  float x1 = (static_cast<float>(vertex1.x) - centerX) * SCALE;
-  float z1 = (static_cast<float>(vertex1.y) - centerY) * SCALE;
-  float x2 = (static_cast<float>(vertex2.x) - centerX) * SCALE;
-  float z2 = (static_cast<float>(vertex2.y) - centerY) * SCALE;
+  float x1 = (static_cast<float>(vertex1.x) - levelCenterX) * SCALE;
+  float z1 = (static_cast<float>(vertex1.y) - levelCenterY) * SCALE;
+  float x2 = (static_cast<float>(vertex2.x) - levelCenterX) * SCALE;
+  float z2 = (static_cast<float>(vertex2.y) - levelCenterY) * SCALE;
 
   // Calculate wall dimensions
   float wallBottom = bottomHeight * SCALE;
@@ -117,8 +118,12 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
     maxY                      = std::max(maxY, static_cast<float>(vertex.y));
   }
 
-  centerX = (minX + maxX) / 2.0f;
-  centerY = (minY + maxY) / 2.0f;
+  float levelCenterX = (minX + maxX) / 2.0f;
+  float levelCenterY = (minY + maxY) / 2.0f;
+
+  // Store level center coordinates in global config for use by other modules
+  OkConfig::setFloat("level.center.x", levelCenterX);
+  OkConfig::setFloat("level.center.y", levelCenterY);
 
   // First, create all flat (floor/ceiling) textures
   for (size_t i = 0; i < level.flats.size(); i++) {
@@ -392,11 +397,16 @@ void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
                                  const WAD::Sidedef        &sidedef,
                                  std::vector<float>        &vertices,
                                  std::vector<unsigned int> &indices) {
+  // Get level center coordinates from global config
+  float       levelCenterX = OkConfig::getFloat("level.center.x");
+  float       levelCenterY = OkConfig::getFloat("level.center.y");
+  const float SCALE        = 1.0f;
+
   // Calculate normalized positions
-  float x1 = (static_cast<float>(vertex1.x) - centerX) * SCALE;
-  float z1 = (static_cast<float>(vertex1.y) - centerY) * SCALE;
-  float x2 = (static_cast<float>(vertex2.x) - centerX) * SCALE;
-  float z2 = (static_cast<float>(vertex2.y) - centerY) * SCALE;
+  float x1 = (static_cast<float>(vertex1.x) - levelCenterX) * SCALE;
+  float z1 = (static_cast<float>(vertex1.y) - levelCenterY) * SCALE;
+  float x2 = (static_cast<float>(vertex2.x) - levelCenterX) * SCALE;
+  float z2 = (static_cast<float>(vertex2.y) - levelCenterY) * SCALE;
 
   // Get ceiling and floor heights, applying the same scale
   float floor1 = static_cast<float>(sector1.floor_height) * SCALE;

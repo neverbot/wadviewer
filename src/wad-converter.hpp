@@ -15,10 +15,6 @@ public:
   static OkPoint              *getPlayerStartPosition(const WAD::Level &level);
 
 private:
-  static float       centerX;
-  static float       centerY;
-  static const float SCALE;
-
   static void calculateLevelBounds(const WAD::Level &level);
 
   /**

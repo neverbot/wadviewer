@@ -79,6 +79,7 @@ private:
    * @brief Calculate the geometric center of a sector.
    * @param level The WAD level data
    * @param sectorVertices Vector of vertex indices for this sector
+   * @param height The height at which to position the center
    * @param centerX Output center X coordinate
    * @param centerY Output center Y coordinate
    * @param centerZ Output center Z coordinate

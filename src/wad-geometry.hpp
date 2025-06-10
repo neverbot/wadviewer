@@ -10,10 +10,6 @@ public:
   static std::vector<OkItem *> createLevelGeometry(const WAD::Level &level);
 
 private:
-  static float       centerX;
-  static float       centerY;
-  static const float SCALE;
-
   static void createWallSection(const WAD::Vertex &vertex1,
                                 const WAD::Vertex &vertex2, float bottomHeight,
                                 float topHeight, const WAD::Sidedef &sidedef,
