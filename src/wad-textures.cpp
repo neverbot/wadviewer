@@ -2,6 +2,13 @@
 #include "okinawa/handlers/textures.hpp"
 #include "okinawa/utils/logger.hpp"
 #include "okinawa/utils/strings.hpp"
+#include "wad.hpp"
+#include <_string.h>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <string>
+#include <vector>
 
 /**
  * @brief Process all textures in a WAD level.

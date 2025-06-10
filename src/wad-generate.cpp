@@ -1,11 +1,17 @@
 #include "wad-generate.hpp"
 #include "okinawa/config/config.hpp"
 #include "okinawa/handlers/textures.hpp"
+#include "okinawa/item/item.hpp"
+#include "okinawa/item/texture.hpp"
 #include "okinawa/utils/logger.hpp"
 #include "okinawa/utils/strings.hpp"
+#include "wad.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <string>
+#include <vector>
 
 // Initialize constants
 const float WADGenerate::SCALE        = 1.0f;

@@ -1,12 +1,21 @@
 #include "wad-geometry.hpp"
 #include "okinawa/config/config.hpp"
 #include "okinawa/handlers/textures.hpp"
+#include "okinawa/item/group.hpp"
+#include "okinawa/item/item.hpp"
+#include "okinawa/item/texture.hpp"
 #include "okinawa/utils/logger.hpp"
 #include "okinawa/utils/strings.hpp"
 #include "wad-generate.hpp"
 #include "wad-textures.hpp"
+#include "wad.hpp"
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <map>
+#include <string>
+#include <vector>
 
 void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
                                     const WAD::Vertex &vertex2,

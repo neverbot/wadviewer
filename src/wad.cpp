@@ -1,10 +1,19 @@
 #include "wad.hpp"
 #include "okinawa/utils/strings.hpp"
+#include <_string.h>
+#include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <set>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 /**
  * @brief WAD constructor

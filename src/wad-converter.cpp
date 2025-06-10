@@ -1,7 +1,13 @@
 #include "wad-converter.hpp"
 #include "okinawa/config/config.hpp"
+#include "okinawa/item/group.hpp"
+#include "okinawa/math/point.hpp"
 #include "wad-geometry.hpp"
+#include "wad.hpp"
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 /**
  * @brief Get the player's starting position in the level as a 3D point.

@@ -1,5 +1,12 @@
 #include "gui.hpp"
+#include "okinawa/core/camera.hpp"
+#include "okinawa/core/gl_config.hpp"
+#include "okinawa/handlers/textures.hpp"
+#include "okinawa/input/input.hpp"
+#include "okinawa/item/item.hpp"
+#include "okinawa/item/texture.hpp"
 #include "okinawa/utils/logger.hpp"
+#include <vector>
 
 GUI::GUI(OkCamera *camera) {
   // Initialize member variables

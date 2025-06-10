@@ -1,7 +1,9 @@
 #ifndef WAD_VIEWER_WAD_HPP
 #define WAD_VIEWER_WAD_HPP
 
+#include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <string>
 #include <vector>
 

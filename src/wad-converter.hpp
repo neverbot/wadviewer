@@ -4,6 +4,8 @@
 #include "./wad.hpp"
 #include "okinawa/item/group.hpp"
 #include "okinawa/math/point.hpp"
+#include <cstdint>
+#include <vector>
 
 class WADConverter {
 public:

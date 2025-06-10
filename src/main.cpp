@@ -3,11 +3,23 @@
 #include "okinawa/core/core.hpp"
 #include "okinawa/handlers/scenes.hpp"
 #include "okinawa/input/input.hpp"
+#include "okinawa/item/group.hpp"
+#include "okinawa/item/item.hpp"
 #include "okinawa/math/math.hpp"
+#include "okinawa/math/point.hpp"
+#include "okinawa/math/rotation.hpp"
 #include "okinawa/scene/scene.hpp"
 #include "okinawa/utils/logger.hpp"
+#include <_string.h>
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <exception>
+#include <glm/trigonometric.hpp>
 #include <iostream>
+#include <limits>
+#include <string>
+#include <vector>
 
 #include "./gui.hpp"
 #include "./wad-converter.hpp"

@@ -2,6 +2,8 @@
 #define WAD_VIEWER_WAD_TEXTURES_HPP
 
 #include "wad.hpp"
+#include <string>
+#include <vector>
 
 class WADTextures {
 public:
