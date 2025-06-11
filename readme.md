@@ -98,9 +98,26 @@ Example:
 
 ### Controls
 
-- WASD: Move camera forward/left/backward/right.
-- Mouse: Look around.
-- Esc: Exit program.
+```
+╔══════════════════════════════════════════════════════════════╗
+║                        CONTROLS HELP                         ║
+╠══════════════════════════════════════════════════════════════╣
+║  TEXTURE VIEWER:                                             ║
+║    SPACE BAR  - Cycle through textures                       ║
+║    T          - Toggle texture viewer visibility             ║
+║    R          - Toggle ceiling/floor visibility              ║
+║                                                              ║
+║  CAMERAS:                                                    ║
+║    1          - Overview camera                              ║
+║    2          - Player start camera                          ║
+║    3          - Origin camera                                ║
+║                                                              ║
+║  MOVEMENT:                                                   ║
+║    W A S D    - Move forward/left/backward/right             ║
+║    MOUSE      - Look around                                  ║
+║    ESC        - Exit application                             ║
+╚══════════════════════════════════════════════════════════════╝
+```
 
 ## Project Structure
 
