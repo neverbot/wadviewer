@@ -278,7 +278,11 @@ int main(int argc, char *argv[]) {
     OkLogger::info("╚══════════════════════════════════════════════════════════════╝");
     // clang-format on
 
-    OkCore::initialize();
+    // Initialize the engine
+    if (!OkCore::initialize()) {
+      OkLogger::error("Main :: Failed to initialize the engine, exiting");
+      return 1;
+    }
 
     // Initialize wadviewer-specific config values
     OkConfig::setBool("viewer.ceilings-floors-visible", true);
@@ -496,8 +500,14 @@ int main(int argc, char *argv[]) {
     OkLogger::info("Scene :: Object count: " +
                    std::to_string(scene->getObjectCount()));
 
-    // Start game loop
-    OkCore::loop(stepCallback, drawCallback);
+    // Verify engine is properly initialized before starting the loop
+    if (OkCore::getWindow() != nullptr && OkCore::getShaderProgram() != 0) {
+      // Start game loop
+      OkCore::loop(stepCallback, drawCallback);
+    } else {
+      OkLogger::error(
+          "Main :: Engine not properly initialized, cannot start main loop");
+    }
 
     // Cleanup
     delete gui;  // Clean up GUI
