@@ -608,11 +608,12 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
         OkTextureHandler::getInstance()->getTexture(group.textureName);
     if (texture) {
       item->setTexture(group.textureName, texture);
-      OkLogger::info("Assigned texture '" + group.textureName +
-                     "' to wall item '" + itemName + "'");
+      OkLogger::info("WADGeometry", "Assigned texture '" + group.textureName +
+                                        "' to wall item '" + itemName + "'");
     } else {
-      OkLogger::error("Could not find texture '" + group.textureName +
-                      "' for wall item '" + itemName + "'");
+      OkLogger::error("WADGeometry", "Could not find texture '" +
+                                         group.textureName +
+                                         "' for wall item '" + itemName + "'");
     }
 
     wallItems.push_back(item);

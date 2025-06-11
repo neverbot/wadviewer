@@ -130,11 +130,12 @@ OkItem *WADGenerate::generateSectorFloor(const WAD::Level       &level,
       OkTextureHandler::getInstance()->getTexture(floorTexName);
   if (texture) {
     item->setTexture(floorTexName, texture);
-    OkLogger::info("Generated floor item '" + itemName + "' with texture '" +
-                   floorTexName + "'");
+    OkLogger::info("WADGenerator", "Generated floor item '" + itemName +
+                                       "' with texture '" + floorTexName + "'");
   } else {
-    OkLogger::warning("Could not find texture '" + floorTexName +
-                      "' for floor item '" + itemName + "'");
+    OkLogger::warning("WADGenerator", "Could not find texture '" +
+                                          floorTexName + "' for floor item '" +
+                                          itemName + "'");
   }
 
   return item;
@@ -206,11 +207,13 @@ OkItem *WADGenerate::generateSectorCeiling(
       OkTextureHandler::getInstance()->getTexture(ceilingTexName);
   if (texture) {
     item->setTexture(ceilingTexName, texture);
-    OkLogger::info("Generated ceiling item '" + itemName + "' with texture '" +
-                   ceilingTexName + "'");
+    OkLogger::info("WADGenerator", "Generated ceiling item '" + itemName +
+                                       "' with texture '" + ceilingTexName +
+                                       "'");
   } else {
-    OkLogger::warning("Could not find texture '" + ceilingTexName +
-                      "' for ceiling item '" + itemName + "'");
+    OkLogger::warning("WADGenerator",
+                      "Could not find texture '" + ceilingTexName +
+                          "' for ceiling item '" + itemName + "'");
   }
 
   return item;

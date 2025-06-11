@@ -80,7 +80,7 @@ void GUI::nextTexture() {
 
   if (texture) {
     texturePreview->setTexture("texture_preview", texture);
-    OkLogger::info("GUI :: Switched to texture: " +
-                   textureNames[currentTextureIndex]);
+    OkLogger::info("GUI",
+                   "Switched to texture: " + textureNames[currentTextureIndex]);
   }
 }

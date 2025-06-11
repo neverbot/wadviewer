@@ -161,8 +161,8 @@ void WADTextures::createFlatTexture(const std::string             &flatName,
   OkTextureHandler::getInstance()->createTextureFromRawData(
       flatName, textureData.data(), FLAT_SIZE, FLAT_SIZE, 4);
 
-  OkLogger::info("WADConverter :: Created flat texture '" + flatName +
-                 "' (64x64)");
+  OkLogger::info("WADTextures",
+                 "Created flat texture '" + flatName + "' (64x64)");
 }
 
 /**
@@ -232,11 +232,12 @@ void WADTextures::createTextureFromDef(
 
   // Create texture even if some patches failed, as long as we have valid data
   if (hasValidPatches) {
-    OkLogger::info("WADConverter :: Creating texture '" + texName + "' (" +
-                   std::to_string(texDef.width) + "x" +
-                   std::to_string(texDef.height) +
-                   "), Valid patches: " + std::to_string(validPatchCount) +
-                   "/" + std::to_string(texDef.patches.size()));
+    OkLogger::info("WADTextures",
+                   "Creating texture '" + texName + "' (" +
+                       std::to_string(texDef.width) + "x" +
+                       std::to_string(texDef.height) +
+                       "), Valid patches: " + std::to_string(validPatchCount) +
+                       "/" + std::to_string(texDef.patches.size()));
 
     // Create texture using the dedicated creation method with pre-trimmed name
     OkTextureHandler::getInstance()->createTextureFromRawData(

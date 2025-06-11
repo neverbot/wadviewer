@@ -77,8 +77,8 @@ void stepCallback(float deltaTime) {
       }
     }
 
-    OkLogger::info("Ceiling/Floor visibility toggled: " +
-                   std::string(ceilingsFloorsVisible ? "ON" : "OFF"));
+    OkLogger::info("UI", "Ceiling/Floor visibility toggled: " +
+                             std::string(ceilingsFloorsVisible ? "ON" : "OFF"));
   }
   lastAction1State = state.action3;
 
@@ -133,7 +133,7 @@ void stepCallback(float deltaTime) {
   static int frameCount = 0;
   if (frameCount++ % 60 == 0) {  // Assuming 60 FPS, adjust if different
     OkPoint position = camera->getPosition();
-    OkLogger::info("Camera pos: " + position.toString());
+    OkLogger::info("Camera", "pos: " + position.toString());
   }
 }
 
@@ -173,10 +173,10 @@ void positionCameraForItem(OkCamera *camera, const OkItem *item) {
 
   camera->setPerspective(fov, nearPlane, farPlane);
 
-  OkLogger::info("Camera positioned at: " + cameraPos.toString());
-  OkLogger::info(
-      "Camera looking at pitch: " + std::to_string(glm::degrees(pitch)) +
-      " yaw: " + std::to_string(glm::degrees(yaw)));
+  OkLogger::info("Camera", "positioned at: " + cameraPos.toString());
+  OkLogger::info("Camera",
+                 "looking at pitch: " + std::to_string(glm::degrees(pitch)) +
+                     " yaw: " + std::to_string(glm::degrees(yaw)));
 }
 
 /**
@@ -239,11 +239,12 @@ void positionCameraForLevel(OkCamera                         *camera,
   float farPlane  = distance * 4.0f;  // Make sure we can see the whole level
   camera->setPerspective(fov, nearPlane, farPlane);
 
-  OkLogger::info("Level bounds: (" + std::to_string(minX) + "," +
-                 std::to_string(minY) + "," + std::to_string(minZ) + ") to (" +
-                 std::to_string(maxX) + "," + std::to_string(maxY) + "," +
-                 std::to_string(maxZ) + ")");
-  OkLogger::info("Camera positioned at: " + cameraPos.toString());
+  OkLogger::info("Level",
+                 "bounds: (" + std::to_string(minX) + "," +
+                     std::to_string(minY) + "," + std::to_string(minZ) +
+                     ") to (" + std::to_string(maxX) + "," +
+                     std::to_string(maxY) + "," + std::to_string(maxZ) + ")");
+  OkLogger::info("Camera", "positioned at: " + cameraPos.toString());
 }
 
 /**
@@ -254,38 +255,52 @@ void positionCameraForLevel(OkCamera                         *camera,
  */
 int main(int argc, char *argv[]) {
   try {
-    OkLogger::info("Main :: Starting up...");
+    OkLogger::info("Main", "Starting up...");
 
     // Display control instructions with ASCII frame
     // clang-format off
-    OkLogger::info("╔══════════════════════════════════════════════════════════════╗");
-    OkLogger::info("║                        CONTROLS HELP                         ║");
-    OkLogger::info("╠══════════════════════════════════════════════════════════════╣");
-    OkLogger::info("║  TEXTURE VIEWER:                                             ║");
-    OkLogger::info("║    SPACE BAR  - Cycle through textures                       ║");
-    OkLogger::info("║    T          - Toggle texture viewer visibility             ║");
-    OkLogger::info("║    R          - Toggle ceiling/floor visibility              ║");
-    OkLogger::info("║                                                              ║");
-    OkLogger::info("║  CAMERAS:                                                    ║");
-    OkLogger::info("║    1          - Overview camera                              ║");
-    OkLogger::info("║    2          - Player start camera                          ║");
-    OkLogger::info("║    3          - Origin camera                                ║");
-    OkLogger::info("║                                                              ║");
-    OkLogger::info("║  MOVEMENT:                                                   ║");
-    OkLogger::info("║    W A S D    - Move forward/left/backward/right             ║");
-    OkLogger::info("║    MOUSE      - Look around                                  ║");
-    OkLogger::info("║    ESC        - Exit application                             ║");
-    OkLogger::info("╚══════════════════════════════════════════════════════════════╝");
+    std::string helpMessage = "\n"
+        "╔══════════════════════════════════════════════════════════════╗\n"
+        "║                        CONTROLS HELP                         ║\n"
+        "╠══════════════════════════════════════════════════════════════╣\n"
+        "║  TEXTURE VIEWER:                                             ║\n"
+        "║    SPACE BAR  - Cycle through textures                       ║\n"
+        "║    T          - Toggle texture viewer visibility             ║\n"
+        "║    R          - Toggle ceiling/floor visibility              ║\n"
+        "║                                                              ║\n"
+        "║  CAMERAS:                                                    ║\n"
+        "║    1          - Overview camera                              ║\n"
+        "║    2          - Player start camera                          ║\n"
+        "║    3          - Origin camera                                ║\n"
+        "║                                                              ║\n"
+        "║  MOVEMENT:                                                   ║\n"
+        "║    W A S D    - Move forward/left/backward/right             ║\n"
+        "║    MOUSE      - Look around                                  ║\n"
+        "║    ESC        - Exit application                             ║\n"
+        "╚══════════════════════════════════════════════════════════════╝";
     // clang-format on
+
+    OkLogger::info("Help", helpMessage);
 
     // Initialize the engine
     if (!OkCore::initialize()) {
-      OkLogger::error("Main :: Failed to initialize the engine, exiting");
+      OkLogger::error("Main", "Failed to initialize the engine, exiting");
       return 1;
     }
 
     // Initialize wadviewer-specific config values
     OkConfig::setBool("viewer.ceilings-floors-visible", true);
+
+    // Configure logger filtering - disable some logs to reduce noise
+    OkLogger::disableLogType("Item");
+    OkLogger::disableLogType("Scene");
+    OkLogger::disableLogType("Level");
+    OkLogger::disableLogType("ItemGroup");
+    OkLogger::disableLogType("TextureHandler");
+
+    OkLogger::disableLogType("WADTextures");
+    OkLogger::disableLogType("WADGeometry");
+    OkLogger::disableLogType("WADGenerator");
 
     // Set initial camera
     OkCamera  *camera = OkCore::getCamera();
@@ -313,9 +328,9 @@ int main(int argc, char *argv[]) {
 
     OkScene *currentScene = sceneHandler->getCurrentScene();
     if (currentScene) {
-      OkLogger::info("Game :: Current scene: " + currentScene->getName());
+      OkLogger::info("Game", "Current scene: " + currentScene->getName());
     } else {
-      OkLogger::error("Game :: No current scene found");
+      OkLogger::error("Game", "No current scene found");
     }
 
     // ******************************************************************************************
@@ -386,14 +401,16 @@ int main(int argc, char *argv[]) {
       // Add sector groups directly to the scene
       for (size_t i = 0; i < sectorGroups.size(); i++) {
         scene->addObject(sectorGroups[i]);
-        OkLogger::info("Added sector group " + std::to_string(i) + " (" +
-                       sectorGroups[i]->getName() + ") to scene at position: " +
-                       sectorGroups[i]->getPosition().toString());
+        OkLogger::info("Scene", "Added sector group " + std::to_string(i) +
+                                    " (" + sectorGroups[i]->getName() +
+                                    ") to scene at position: " +
+                                    sectorGroups[i]->getPosition().toString());
       }
 
       // Log sector group information
-      OkLogger::info("Level converted to " +
-                     std::to_string(sectorGroups.size()) + " sector groups");
+      OkLogger::info("Level", "converted to " +
+                                  std::to_string(sectorGroups.size()) +
+                                  " sector groups");
 
       for (size_t i = 0; i < sectorGroups.size(); i++) {
         OkItemGroup *group        = sectorGroups[i];
@@ -401,11 +418,12 @@ int main(int argc, char *argv[]) {
         int          floorCount   = group->getItemCountWithTag("floor");
         int          ceilingCount = group->getItemCountWithTag("ceiling");
 
-        OkLogger::info("Sector " + std::to_string(i) + " (" + group->getName() +
-                       "): " + std::to_string(group->getItemCount()) +
-                       " items - Walls: " + std::to_string(wallCount) +
-                       ", Floors: " + std::to_string(floorCount) +
-                       ", Ceilings: " + std::to_string(ceilingCount));
+        OkLogger::info("Level",
+                       "Sector " + std::to_string(i) + " (" + group->getName() +
+                           "): " + std::to_string(group->getItemCount()) +
+                           " items - Walls: " + std::to_string(wallCount) +
+                           ", Floors: " + std::to_string(floorCount) +
+                           ", Ceilings: " + std::to_string(ceilingCount));
 
         group->setDrawOriginAxisForAll(false);
         group->setDrawOriginAxis(true);
@@ -497,8 +515,8 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
     // ******************************************************************************************
 
-    OkLogger::info("Scene :: Object count: " +
-                   std::to_string(scene->getObjectCount()));
+    OkLogger::info("Scene",
+                   "Object count: " + std::to_string(scene->getObjectCount()));
 
     // Verify engine is properly initialized before starting the loop
     if (OkCore::getWindow() != nullptr && OkCore::getShaderProgram() != 0) {
@@ -517,10 +535,10 @@ int main(int argc, char *argv[]) {
 
     return 1;
   } catch (const std::exception &e) {
-    OkLogger::error("Main :: Unhandled exception: " + std::string(e.what()));
+    OkLogger::error("Main", "Unhandled exception: " + std::string(e.what()));
     return 1;
   } catch (...) {
-    OkLogger::error("Main :: Unknown unhandled exception");
+    OkLogger::error("Main", "Unknown unhandled exception");
     return 1;
   }
 }
