@@ -2,6 +2,10 @@
 
 A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://github.com/okinawa-dev/okinawa.cpp). This tool allows you to view WAD ([Where's All the Data](https://doomwiki.org/wiki/WAD)) files, commonly used in games like DOOM, displaying their 3D geometry and textures.
 
+<p align="center">
+  <img width="500" alt="screenshot" src="/assets/project/screenshot.png">
+</p>
+
 ## Features
 
 - Load and view WAD file geometry.
