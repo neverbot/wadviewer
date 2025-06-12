@@ -48,22 +48,101 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
       sqrtf(powf(static_cast<float>(vertex2.x - vertex1.x), 2.0f) +
             powf(static_cast<float>(vertex2.y - vertex1.y), 2.0f));
 
-  // DOOM texture constants
-  const float TEXTURE_WIDTH  = 64.0f;
-  const float TEXTURE_HEIGHT = 128.0f;
+  // Default DOOM texture constants (fallback values)
+  float textureWidth  = 64.0f;
+  float textureHeight = 128.0f;
 
-  // Calculate texture coordinates
+  // Try to get actual texture dimensions from the texture handler
+  // We need to extract texture name from sidedef to get proper dimensions
+  std::string textureName = "";
+  for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
+    textureName += sidedef.middle_texture[i];
+  }
+  
+  OkTexture *texture = OkTextureHandler::getInstance()->getTexture(textureName);
+  if (texture) {
+    textureWidth  = static_cast<float>(texture->getWidth());
+    textureHeight = static_cast<float>(texture->getHeight());
+  }
+
+  // Get texture offsets from sidedef
   float uOffset = static_cast<float>(sidedef.x_offset);
   float vOffset = static_cast<float>(sidedef.y_offset);
 
-  // Calculate number of texture repeats based on unscaled wall length
-  float numRepeats = wallLength / TEXTURE_WIDTH;
+  // Calculate U coordinates - texture repeats horizontally based on wall length
+  float uOffsetNormalized = uOffset / textureWidth;
+  float uRepeat           = wallLength / textureWidth;
+  float u1                = uOffsetNormalized;
+  float u2                = u1 + uRepeat;
 
-  // Apply texture coordinates
-  float u1 = uOffset / TEXTURE_WIDTH;
-  float u2 = u1 + numRepeats;
-  float v1 = vOffset / TEXTURE_HEIGHT;
-  float v2 = v1 + (wallHeight / (TEXTURE_HEIGHT * SCALE));
+  // DOOM V coordinate system to OpenGL conversion:
+  //
+  // DOOM texture coordinate system:
+  // - V=0 is at the TOP of the texture image
+  // - Textures are anchored at the BOTTOM of the wall
+  // - Positive vOffset moves texture DOWN relative to wall bottom
+  // - V increases downward in the texture image
+  //
+  // OpenGL texture coordinate system:
+  // - V=0 is at the BOTTOM of the texture image
+  // - V=1 is at the TOP of the texture image
+  // - V increases upward in the texture image
+
+  // Calculate texture coordinates for DOOM->OpenGL conversion
+  float wallHeightInTexture = wallHeight / textureHeight;
+  float vOffsetInTexture = vOffset / textureHeight;
+
+  // DOOM texture anchoring algorithm:
+  // 1. Texture is anchored at wall bottom
+  // 2. vOffset shifts the texture downward (positive = texture moves down)
+  // 3. We sample from texture starting at vOffset pixels from texture bottom
+
+  // In DOOM texture space (normalized coordinates where 0=top, 1=bottom):
+  // Wall bottom samples from: 1.0 - vOffsetInTexture (texture bottom + offset)
+  // Wall top samples from: 1.0 - vOffsetInTexture - wallHeightInTexture
+  
+  float vDoomBottom = 1.0f - vOffsetInTexture;  // Wall bottom in DOOM coords
+  float vDoomTop = vDoomBottom - wallHeightInTexture;  // Wall top in DOOM coords
+
+  // Convert DOOM V coordinates to OpenGL V coordinates (flip Y axis)
+  // DOOM V=0 (texture top) -> OpenGL V=1
+  // DOOM V=1 (texture bottom) -> OpenGL V=0
+  float vBottom = 1.0f - vDoomBottom;  // Wall bottom in OpenGL
+  float vTop = 1.0f - vDoomTop;        // Wall top in OpenGL
+
+  // Handle texture wrapping for walls taller than texture
+  if (wallHeight > textureHeight) {
+    // Allow V coordinates to extend beyond [0,1] for tiling
+    vTop = vBottom + wallHeightInTexture;
+  }
+
+  // Handle negative vOffset (texture shifted up)
+  if (vOffset < 0.0f) {
+    float shift = (-vOffset) / textureHeight;
+    vBottom += shift;
+    vTop += shift;
+  }
+
+  // Debug V coordinates (enhanced logging for texture issues)
+  // Log walls over 100 length OR door textures for debugging
+  bool shouldLog = (wallLength > 100.0f) || (sidedef.middle_texture[0] == 'D' &&
+                                             sidedef.middle_texture[1] == 'O');
+  if (shouldLog) {
+    std::string texName = "";
+    for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
+      texName += sidedef.middle_texture[i];
+    }
+    OkLogger::info(
+        "UV_DEBUG",
+        "Texture: " + texName + ", Wall length: " + std::to_string(wallLength) +
+            ", Height: " + std::to_string(wallHeight) +
+            ", vOffset: " + std::to_string(vOffset) +
+            ", U1: " + std::to_string(u1) + ", U2: " + std::to_string(u2) +
+            ", vBottom: " + std::to_string(vBottom) +
+            ", vTop: " + std::to_string(vTop) +
+            ", vHeight: " + std::to_string(wallHeightNormalized));
+    debugCount++;
+  }
 
   // Add vertices with texture coordinates
   // Bottom left
@@ -71,28 +150,28 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   vertices.push_back(wallBottom);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(v1);
+  vertices.push_back(vBottom);
 
   // Top left
   vertices.push_back(x1);
   vertices.push_back(wallTop);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(v2);
+  vertices.push_back(vTop);
 
   // Bottom right
   vertices.push_back(x2);
   vertices.push_back(wallBottom);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(v1);
+  vertices.push_back(vBottom);
 
   // Top right
   vertices.push_back(x2);
   vertices.push_back(wallTop);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(v2);
+  vertices.push_back(vTop);
 
   // Add indices (CCW winding)
   unsigned int baseIndex = vertices.size() / 5 - 4;  // We just added 4 vertices
@@ -262,11 +341,14 @@ void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
       static_cast<unsigned int>(vertices.size() / 5);  // 5 floats per vertex
 
   // Calculate texture coordinates
+  // DOOM texture offsets are in texture pixels, normalize to 0-1 range
   float u1 = uOffset / TEXTURE_WIDTH;
   float u2 = u1 + (wallLength / TEXTURE_WIDTH);  // Texture repeats along length
-  float v1 = vOffset / TEXTURE_HEIGHT;
-  float v2 = v1 + (wallHeight /
-                   (TEXTURE_HEIGHT * SCALE));  // Scale height for texturing
+  // DOOM V coordinates: textures are anchored at bottom-left
+  // vOffset = 0 means texture starts at bottom of wall
+  // For OpenGL: v=0 is bottom, v=1 is top
+  float vBottom = vOffset / TEXTURE_HEIGHT;                 // Bottom of texture
+  float vTop    = vBottom + (wallHeight / TEXTURE_HEIGHT);  // Top of texture
 
   // Add vertices for the wall quad with proper texture coordinates
   // Bottom left
@@ -274,28 +356,28 @@ void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
   vertices.push_back(wallBottom);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(v1);
+  vertices.push_back(vBottom);
 
   // Top left
   vertices.push_back(x1);
   vertices.push_back(wallTop);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(v2);
+  vertices.push_back(vTop);
 
   // Bottom right
   vertices.push_back(x2);
   vertices.push_back(wallBottom);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(v1);
+  vertices.push_back(vBottom);
 
   // Top right
   vertices.push_back(x2);
   vertices.push_back(wallTop);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(v2);
+  vertices.push_back(vTop);
 
   // Add indices for two triangles (CCW winding)
   indices.push_back(baseIndex);      // Bottom left
