@@ -62,3 +62,6 @@ coverage/
 
 # local scripts
 *.sh
+
+# logs
+*.log
