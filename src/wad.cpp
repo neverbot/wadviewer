@@ -1,5 +1,4 @@
 #include "wad.hpp"
-#include "okinawa/utils/strings.hpp"
 #include <_string.h>
 #include <cctype>
 #include <cstddef>
@@ -15,13 +14,29 @@
 #include <string>
 #include <vector>
 
+// Local trimFixedString implementation
+static std::string trimString(const std::string &str, size_t maxLen) {
+  static const std::string whitespace = " \t\n\r\f\v";
+  std::string              result;
+  if (str.length() > maxLen) {
+    result = str.substr(0, maxLen);
+  } else {
+    result = str;
+  }
+  size_t last = result.find_last_not_of(whitespace);
+  if (last == std::string::npos) {
+    return "";
+  }
+  return result.substr(0, last + 1);
+}
+
 /**
  * @brief WAD constructor
  * @param filepath Path to the WAD file
  * @throws std::runtime_error if the file cannot be opened or is not a valid WAD
  * file
  */
-WAD::WAD(const std::string &filepath, WADFormat format, bool verbose) {
+WAD::WAD(const std::string &filepath, bool verbose) {
   filepath_ = filepath;
   verbose_  = verbose;
 
@@ -80,7 +95,7 @@ void WAD::readDirectory() {
  * @return true if the name is a level marker, false otherwise
  */
 bool WAD::isLevelMarker(const std::string &name) {
-  std::string cleanName = OkStrings::trimFixedString(name, 8);
+  std::string cleanName = trimString(name, 8);
 
   // DOOM 1 level names are ExMy (x = episode, y = mission)
   if (cleanName.length() == 4 && cleanName[0] == 'E' && cleanName[2] == 'M' &&
@@ -110,7 +125,7 @@ bool WAD::isLevelMarker(const std::string &name) {
 bool WAD::findLump(const std::string &name, uint32_t &offset, uint32_t &size,
                    size_t startIndex) const {
   for (size_t i = startIndex; i < directory_.size(); i++) {
-    std::string lumpName = OkStrings::trimFixedString(directory_[i].name, 8);
+    std::string lumpName = trimString(directory_[i].name, 8);
 
     // Stop searching for level data at next level marker
     if (name == "VERTEXES" || name == "LINEDEFS" || name == "SIDEDEFS" ||
@@ -298,7 +313,7 @@ std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
   // Read patch names (8 bytes each, zero-terminated)
   const char *name_data = reinterpret_cast<const char *>(data.data() + 4);
   for (uint32_t i = 0; i < num_patches; i++) {
-    names.push_back(OkStrings::trimFixedString(name_data + i * 8, 8));
+    names.push_back(trimString(name_data + i * 8, 8));
   }
 
   return names;
@@ -558,7 +573,7 @@ void WAD::processWAD() {
 
   // Now process levels (using the loaded textures/patches)
   for (size_t i = 0; i < directory_.size(); i++) {
-    std::string lumpName = OkStrings::trimFixedString(directory_[i].name, 8);
+    std::string lumpName = trimString(directory_[i].name, 8);
 
     if (isLevelMarker(lumpName)) {
       Level level;
@@ -598,10 +613,8 @@ void WAD::processWAD() {
       // Load all unique flat textures referenced by sectors
       std::set<std::string> uniqueFlats;
       for (size_t j = 0; j < level.sectors.size(); j++) {
-        std::string floorTex =
-            OkStrings::trimFixedString(level.sectors[j].floor_texture, 8);
-        std::string ceilTex =
-            OkStrings::trimFixedString(level.sectors[j].ceiling_texture, 8);
+        std::string floorTex = trimString(level.sectors[j].floor_texture, 8);
+        std::string ceilTex  = trimString(level.sectors[j].ceiling_texture, 8);
 
         if (!floorTex.empty() && floorTex != "-") {
           uniqueFlats.insert(floorTex);
@@ -850,9 +863,9 @@ std::string WAD::toJSON() const {
       const Sidedef &s = level.sidedefs[sideIndex];
       jsi.push_back({{"x", s.x_offset},
                      {"y", s.y_offset},
-                     {"u", OkStrings::trimFixedString(s.upper_texture, 8)},
-                     {"l", OkStrings::trimFixedString(s.lower_texture, 8)},
-                     {"m", OkStrings::trimFixedString(s.middle_texture, 8)},
+                     {"u", trimString(s.upper_texture, 8)},
+                     {"l", trimString(s.lower_texture, 8)},
+                     {"m", trimString(s.middle_texture, 8)},
                      {"s", s.sector}});
     }
     // levelJson["si"] = jsi;
@@ -865,8 +878,8 @@ std::string WAD::toJSON() const {
       const Sector &s = level.sectors[sectIndex];
       jse.push_back({{"f", s.floor_height},
                      {"c", s.ceiling_height},
-                     {"t", OkStrings::trimFixedString(s.floor_texture, 8)},
-                     {"x", OkStrings::trimFixedString(s.ceiling_texture, 8)},
+                     {"t", trimString(s.floor_texture, 8)},
+                     {"x", trimString(s.ceiling_texture, 8)},
                      {"l", s.light_level},
                      {"y", s.type},
                      {"g", s.tag}});

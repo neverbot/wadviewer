@@ -1,5 +1,5 @@
-#ifndef WAD_VIEWER_WAD_HPP
-#define WAD_VIEWER_WAD_HPP
+#ifndef WAD_HPP
+#define WAD_HPP
 
 #include <cstddef>
 #include <cstdint>
@@ -44,8 +44,7 @@ enum class WADFormat : std::uint8_t {
 class WAD {
 public:
   // Constructor takes WAD file path
-  explicit WAD(const std::string &filepath, WADFormat format,
-               bool verbose = false);
+  explicit WAD(const std::string &filepath, bool verbose = false);
 
   // WAD header structure
   struct Header {
@@ -223,4 +222,4 @@ private:
   std::vector<Color>       readPalette(std::streamoff offset, std::size_t size);
 };
 
-#endif  // WAD_VIEWER_WAD_HPP
+#endif  // WAD_HPP
