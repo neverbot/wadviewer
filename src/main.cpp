@@ -351,10 +351,10 @@ int main(int argc, char *argv[]) {
     }
     // clang-format on
 
-    WADFormat   format = WADFormat::WAD;  // Default format
+    // WADFormat   format = WADFormat::WAD;  // Default format
     std::string contentFile;
-    std::string levelName = "";  // Empty string means use first level
-    bool        verbose = false; // Default: not verbose
+    std::string levelName = "";     // Empty string means use first level
+    bool        verbose   = false;  // Default: not verbose
 
     // Check for verbose flag in all arguments
     for (int i = 1; i < argc; i++) {
@@ -366,18 +366,18 @@ int main(int argc, char *argv[]) {
 
     // Check if first argument is a format specification
     if (argv[1][0] == '-' && std::string(argv[1]) != "--verbose") {
-      std::string formatStr = argv[1];
-      formatStr             = formatStr.substr(1);  // Remove the leading '-'
+      // std::string formatStr = argv[1];
+      // formatStr             = formatStr.substr(1);  // Remove the leading '-'
 
-      if (formatStr == "wad") {
-        format = WADFormat::WAD;
-      } else if (formatStr == "json") {
-        format = WADFormat::JSON;
-      } else if (formatStr == "dsl") {
-        format = WADFormat::DSL;
-      } else {
-        std::cerr << "Invalid format specified. Using default (wad)\n";
-      }
+      // if (formatStr == "wad") {
+      //   format = WADFormat::WAD;
+      // } else if (formatStr == "json") {
+      //   format = WADFormat::JSON;
+      // } else if (formatStr == "dsl") {
+      //   format = WADFormat::DSL;
+      // } else {
+      //   std::cerr << "Invalid format specified. Using default (wad)\n";
+      // }
 
       contentFile = argv[2];
       if (argc >= 4 && std::string(argv[3]) != "--verbose") {
@@ -392,7 +392,7 @@ int main(int argc, char *argv[]) {
     }
 
     try {
-      WAD wad(contentFile, format, verbose);  // Pass verbose flag
+      WAD wad(contentFile, verbose);  // Pass verbose flag
       wad.processWAD();
 
       // If no level name was provided, use the first level
