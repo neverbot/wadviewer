@@ -315,6 +315,46 @@ WADGeometry::createSectorGroup(const WAD::Level  &level,
   std::string  groupName   = "sector_" + std::to_string(sectorIndex);
   OkItemGroup *sectorGroup = new OkItemGroup(groupName);
 
+  // Calculate sector center for group positioning using normalized coordinates
+  float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f;
+  if (!sectorVertices.empty()) {
+    // Get level center coordinates from global config for normalization
+    float levelCenterX = OkConfig::getFloat("level.center.x");
+    float levelCenterY = OkConfig::getFloat("level.center.y");
+
+    // Calculate X and Z center from sector vertices using normalized
+    // coordinates DOOM coordinate system: X stays X, Y becomes Z in 3D space
+    float minX = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float minZ = std::numeric_limits<float>::max();
+    float maxZ = std::numeric_limits<float>::lowest();
+
+    for (size_t i = 0; i < sectorVertices.size(); i++) {
+      if (sectorVertices[i] < static_cast<int>(level.vertices.size())) {
+        const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
+        // Apply the same coordinate transformation as walls/floors/ceilings
+        // DOOM Y becomes OpenGL Z, DOOM X becomes OpenGL X
+        // Z coordinate is negated to match geometry coordinate system
+        float x = (static_cast<float>(vertex.x) - levelCenterX);
+        float z = -((static_cast<float>(vertex.y) - levelCenterY));
+        minX    = std::min(minX, x);
+        maxX    = std::max(maxX, x);
+        minZ    = std::min(minZ, z);
+        maxZ    = std::max(maxZ, z);
+      }
+    }
+
+    centerX = (minX + maxX) * 0.5f;
+    centerZ = (minZ + maxZ) * 0.5f;
+    // Y center is middle between floor and ceiling (height in 3D)
+    centerY = (static_cast<float>(sector.floor_height) +
+               static_cast<float>(sector.ceiling_height)) *
+              0.5f;
+  }
+
+  // Position the group at the sector center
+  sectorGroup->setPosition(centerX, centerY, centerZ);
+
   // Add sector tag
   std::vector<std::string> sectorTags;
   sectorTags.push_back("sector");
