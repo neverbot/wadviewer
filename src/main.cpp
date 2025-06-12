@@ -341,11 +341,12 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
 
     // clang-format off
-    if (argc < 2 || argc > 4) {
-      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>]\n";
+    if (argc < 2 || argc > 5) {
+      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose]\n";
       std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
       std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
       std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
+      std::cout << "  --verbose   : Optional. Enable verbose debug output\n";
       return 1;
     }
     // clang-format on
@@ -353,9 +354,18 @@ int main(int argc, char *argv[]) {
     WADFormat   format = WADFormat::WAD;  // Default format
     std::string contentFile;
     std::string levelName = "";  // Empty string means use first level
+    bool        verbose = false; // Default: not verbose
+
+    // Check for verbose flag in all arguments
+    for (int i = 1; i < argc; i++) {
+      if (std::string(argv[i]) == "--verbose") {
+        verbose = true;
+        break;
+      }
+    }
 
     // Check if first argument is a format specification
-    if (argv[1][0] == '-') {
+    if (argv[1][0] == '-' && std::string(argv[1]) != "--verbose") {
       std::string formatStr = argv[1];
       formatStr             = formatStr.substr(1);  // Remove the leading '-'
 
@@ -370,19 +380,19 @@ int main(int argc, char *argv[]) {
       }
 
       contentFile = argv[2];
-      if (argc == 4) {
+      if (argc >= 4 && std::string(argv[3]) != "--verbose") {
         levelName = argv[3];
       }
     } else {
       // No format specified, use defaults
       contentFile = argv[1];
-      if (argc == 3) {
+      if (argc >= 3 && std::string(argv[2]) != "--verbose") {
         levelName = argv[2];
       }
     }
 
     try {
-      WAD wad(contentFile, format);  // Verbose mode
+      WAD wad(contentFile, format, verbose);  // Pass verbose flag
       wad.processWAD();
 
       // If no level name was provided, use the first level
