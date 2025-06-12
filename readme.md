@@ -39,7 +39,7 @@ cd ..
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/wadviewer.git
+git clone https://github.com/neverbot/wadviewer.git
 cd wadviewer
 
 # Install dependencies using Conan
@@ -56,7 +56,7 @@ cmake --build --preset debug
 
 ```bash
 # Clone the repository (if not already done)
-git clone https://github.com/yourusername/wadviewer.git
+git clone https://github.com/neverbot/wadviewer.git
 cd wadviewer
 
 # Install dependencies using Conan
