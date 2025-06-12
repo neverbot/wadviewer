@@ -128,6 +128,9 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   // Log walls over 100 length OR door textures for debugging
   bool shouldLog = (wallLength > 100.0f) || (sidedef.middle_texture[0] == 'D' &&
                                              sidedef.middle_texture[1] == 'O');
+  // Calculate normalized wall height
+  float wallHeightNormalized = wallHeight / textureHeight;
+
   if (shouldLog) {
     std::string texName = "";
     for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
@@ -142,8 +145,11 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
             ", vBottom: " + std::to_string(vBottom) +
             ", vTop: " + std::to_string(vTop) +
             ", vHeight: " + std::to_string(wallHeightNormalized));
-    debugCount++;
   }
+
+  // Flip V axis for OpenGL
+  vBottom = 1.0f - vBottom;
+  vTop    = 1.0f - vTop;
 
   // Add vertices with texture coordinates
   // Bottom left
