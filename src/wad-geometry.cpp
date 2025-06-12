@@ -58,7 +58,7 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
     textureName += sidedef.middle_texture[i];
   }
-  
+
   OkTexture *texture = OkTextureHandler::getInstance()->getTexture(textureName);
   if (texture) {
     textureWidth  = static_cast<float>(texture->getWidth());
@@ -90,7 +90,7 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
 
   // Calculate texture coordinates for DOOM->OpenGL conversion
   float wallHeightInTexture = wallHeight / textureHeight;
-  float vOffsetInTexture = vOffset / textureHeight;
+  float vOffsetInTexture    = vOffset / textureHeight;
 
   // DOOM texture anchoring algorithm:
   // 1. Texture is anchored at wall bottom
@@ -100,15 +100,16 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   // In DOOM texture space (normalized coordinates where 0=top, 1=bottom):
   // Wall bottom samples from: 1.0 - vOffsetInTexture (texture bottom + offset)
   // Wall top samples from: 1.0 - vOffsetInTexture - wallHeightInTexture
-  
+
   float vDoomBottom = 1.0f - vOffsetInTexture;  // Wall bottom in DOOM coords
-  float vDoomTop = vDoomBottom - wallHeightInTexture;  // Wall top in DOOM coords
+  float vDoomTop =
+      vDoomBottom - wallHeightInTexture;  // Wall top in DOOM coords
 
   // Convert DOOM V coordinates to OpenGL V coordinates (flip Y axis)
   // DOOM V=0 (texture top) -> OpenGL V=1
   // DOOM V=1 (texture bottom) -> OpenGL V=0
   float vBottom = 1.0f - vDoomBottom;  // Wall bottom in OpenGL
-  float vTop = 1.0f - vDoomTop;        // Wall top in OpenGL
+  float vTop    = 1.0f - vDoomTop;     // Wall top in OpenGL
 
   // Handle texture wrapping for walls taller than texture
   if (wallHeight > textureHeight) {
