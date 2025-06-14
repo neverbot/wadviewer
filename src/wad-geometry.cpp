@@ -128,23 +128,20 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   // Log walls over 100 length OR door textures for debugging
   bool shouldLog = (wallLength > 100.0f) || (sidedef.middle_texture[0] == 'D' &&
                                              sidedef.middle_texture[1] == 'O');
-  // Calculate normalized wall height
-  float wallHeightNormalized = wallHeight / textureHeight;
+
+  // Ensure UV coordinates match the real size of the polygon
+  float vRepeat = wallHeight / textureHeight;
 
   if (shouldLog) {
     std::string texName = "";
     for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
       texName += sidedef.middle_texture[i];
     }
-    OkLogger::info(
-        "UV_DEBUG",
-        "Texture: " + texName + ", Wall length: " + std::to_string(wallLength) +
-            ", Height: " + std::to_string(wallHeight) +
-            ", vOffset: " + std::to_string(vOffset) +
-            ", U1: " + std::to_string(u1) + ", U2: " + std::to_string(u2) +
-            ", vBottom: " + std::to_string(vBottom) +
-            ", vTop: " + std::to_string(vTop) +
-            ", vHeight: " + std::to_string(wallHeightNormalized));
+    OkLogger::info("UV_DEBUG", "Texture: " + texName + ", Wall length: " +
+                                   std::to_string(wallLength) +
+                                   ", Height: " + std::to_string(wallHeight) +
+                                   ", U repeat: " + std::to_string(uRepeat) +
+                                   ", V repeat: " + std::to_string(vRepeat));
   }
 
   // Flip V axis for OpenGL
@@ -356,6 +353,30 @@ void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
   // For OpenGL: v=0 is bottom, v=1 is top
   float vBottom = vOffset / TEXTURE_HEIGHT;                 // Bottom of texture
   float vTop    = vBottom + (wallHeight / TEXTURE_HEIGHT);  // Top of texture
+
+  // Ensure textureHeight and shouldLog are defined in the correct scope
+  float textureHeight = 128.0f;  // Default DOOM texture height
+
+  // Adjust UV mapping for upper, middle, and lower textures
+  float upperWallHeight =
+      static_cast<float>(sector1.ceiling_height - sector2.ceiling_height);
+  float vUpperRepeat = upperWallHeight / textureHeight;
+  vTop               = vBottom + vUpperRepeat;
+
+  float lowerWallHeight =
+      static_cast<float>(sector2.floor_height - sector1.floor_height);
+  float vLowerRepeat = lowerWallHeight / textureHeight;
+  vTop               = vBottom + vLowerRepeat;
+
+  float middleWallHeight = wallHeight;
+  float vMiddleRepeat    = middleWallHeight / textureHeight;
+  vTop                   = vBottom + vMiddleRepeat;
+
+  // Debug UV mapping for textures
+
+  OkLogger::info("UV_DEBUG",
+                 "Adjusted UV mapping: vBottom=" + std::to_string(vBottom) +
+                     ", vTop=" + std::to_string(vTop));
 
   // Add vertices for the wall quad with proper texture coordinates
   // Bottom left
