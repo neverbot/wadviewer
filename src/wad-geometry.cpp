@@ -208,14 +208,19 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   }
 
   // Only log essential UV info to reduce clutter for standard textures
-  OkLogger::info("UV_DEBUG", "Texture: " + textureName +
-                                 ", Length: " + std::to_string(wallLength) +
-                                 ", U: " + std::to_string(uRepeat) +
-                                 ", V: " + std::to_string(vRepeat));
+  OkLogger::info("UV_DEBUG",
+                 "Texture: " + textureName +
+                     ", Length: " + std::to_string(wallLength) +
+                     ", U: " + std::to_string(uRepeat) +
+                     ", V: " + std::to_string(vRepeat) +
+                     ", Final UV: vBottom=" + std::to_string(vBottom) +
+                     ", vTop=" + std::to_string(vTop));
 
-  // Flip V axis for OpenGL
-  vBottom = 1.0f - vBottom;
-  vTop    = 1.0f - vTop;
+  // Simple Y-axis flip: swap top and bottom V coordinates to correct texture
+  // orientation This flips the texture vertically without changing the UV range
+  // or scale
+  float vBottomFinal = vTop;
+  float vTopFinal    = vBottom;
 
   // Add vertices with texture coordinates
   // Bottom left
@@ -223,28 +228,28 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   vertices.push_back(wallBottom);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(vBottom);
+  vertices.push_back(vBottomFinal);
 
   // Top left
   vertices.push_back(x1);
   vertices.push_back(wallTop);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(vTop);
+  vertices.push_back(vTopFinal);
 
   // Bottom right
   vertices.push_back(x2);
   vertices.push_back(wallBottom);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(vBottom);
+  vertices.push_back(vBottomFinal);
 
   // Top right
   vertices.push_back(x2);
   vertices.push_back(wallTop);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(vTop);
+  vertices.push_back(vTopFinal);
 
   // Log final wall vertex positions for debugging
   OkLogger::info(
@@ -254,8 +259,8 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
           ", X range: " + std::to_string(x1) + " to " + std::to_string(x2) +
           ", Z range: " + std::to_string(-z1) + " to " + std::to_string(-z2) +
           ", UV: u1=" + std::to_string(u1) + ", u2=" + std::to_string(u2) +
-          ", vBottom=" + std::to_string(vBottom) +
-          ", vTop=" + std::to_string(vTop));
+          ", vBottomFinal=" + std::to_string(vBottomFinal) +
+          ", vTopFinal=" + std::to_string(vTopFinal));
 
   // Add indices (CCW winding)
   unsigned int baseIndex = vertices.size() / 5 - 4;  // We just added 4 vertices
@@ -343,25 +348,25 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
     }
   }
 
-  // DEBUG: Create only the first THREE sectors to progressively find UV issues
-  int maxSectors = std::min(3, static_cast<int>(level.sectors.size()));
-  for (int i = 0; i < maxSectors; i++) {
-    const WAD::Sector &sector = level.sectors[i];
+  // Create geometry for all sectors in the level
+  for (size_t i = 0; i < level.sectors.size(); i++) {
+    const WAD::Sector &sector      = level.sectors[i];
+    int                sectorIndex = static_cast<int>(i);
 
     // Generate vertices for this sector
     std::vector<int> sectorVertices =
-        WADGenerate::generateSectorVertices(level, i);
+        WADGenerate::generateSectorVertices(level, sectorIndex);
 
     // Create the sector group
     OkItemGroup *sectorGroup =
-        createSectorGroup(level, sector, i, sectorVertices);
+        createSectorGroup(level, sector, sectorIndex, sectorVertices);
 
     if (sectorGroup) {
       sectorGroups.push_back(sectorGroup);
     }
+
+    OkLogger::info("SECTOR_DEBUG", "Created sector " + std::to_string(i));
   }
-  OkLogger::info("SECTOR_DEBUG", "Created first " + std::to_string(maxSectors) +
-                                     " sectors for progressive debugging");
 
   return sectorGroups;
 }
