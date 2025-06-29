@@ -23,6 +23,12 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
                                     const WAD::Sidedef        &sidedef,
                                     std::vector<float>        &vertices,
                                     std::vector<unsigned int> &indices) {
+  // CRITICAL DEBUG: Log wall creation with raw DOOM values
+  OkLogger::info("WALL_SECTION",
+                 "Creating wall - Bottom: " + std::to_string(bottomHeight) +
+                     ", Top: " + std::to_string(topHeight) + ", Raw Height: " +
+                     std::to_string(topHeight - bottomHeight) + "\n");
+
   // Get level center coordinates from global config
   float       levelCenterX = OkConfig::getFloat("level.center.x");
   float       levelCenterY = OkConfig::getFloat("level.center.y");
@@ -39,7 +45,19 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   float wallTop    = topHeight * SCALE;
   float wallHeight = wallTop - wallBottom;
 
+  // Enhanced logging for wall dimensions debugging
+  OkLogger::info("WALL_DEBUG",
+                 "Wall dimensions - Bottom: " + std::to_string(bottomHeight) +
+                     " -> " + std::to_string(wallBottom) +
+                     ", Top: " + std::to_string(topHeight) + " -> " +
+                     std::to_string(wallTop) +
+                     ", Height: " + std::to_string(wallHeight) +
+                     ", Scale: " + std::to_string(SCALE));
+
   if (wallHeight <= 0.0f) {
+    OkLogger::warning("WALL_DEBUG",
+                      "Skipping wall with zero or negative height: " +
+                          std::to_string(wallHeight));
     return;
   }
 
@@ -47,6 +65,14 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   float wallLength =
       sqrtf(powf(static_cast<float>(vertex2.x - vertex1.x), 2.0f) +
             powf(static_cast<float>(vertex2.y - vertex1.y), 2.0f));
+
+  // Log wall geometry details
+  OkLogger::info("WALL_DEBUG",
+                 "Wall geometry - Length: " + std::to_string(wallLength) +
+                     ", Vertices: (" + std::to_string(vertex1.x) + "," +
+                     std::to_string(vertex1.y) + ") to (" +
+                     std::to_string(vertex2.x) + "," +
+                     std::to_string(vertex2.y) + ")");
 
   // Default DOOM texture constants (fallback values)
   float textureWidth  = 64.0f;
@@ -63,6 +89,15 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   if (texture) {
     textureWidth  = static_cast<float>(texture->getWidth());
     textureHeight = static_cast<float>(texture->getHeight());
+    OkLogger::info("WALL_DEBUG",
+                   "Using texture '" + textureName +
+                       "' dimensions: " + std::to_string(textureWidth) + "x" +
+                       std::to_string(textureHeight));
+  } else {
+    OkLogger::info("WALL_DEBUG", "Using default texture dimensions for '" +
+                                     textureName +
+                                     "': " + std::to_string(textureWidth) +
+                                     "x" + std::to_string(textureHeight));
   }
 
   // Get texture offsets from sidedef
@@ -124,25 +159,59 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
     vTop += shift;
   }
 
-  // Debug V coordinates (enhanced logging for texture issues)
-  // Log walls over 100 length OR door textures for debugging
-  bool shouldLog = (wallLength > 100.0f) || (sidedef.middle_texture[0] == 'D' &&
-                                             sidedef.middle_texture[1] == 'O');
-
-  // Ensure UV coordinates match the real size of the polygon
-  float vRepeat = wallHeight / textureHeight;
-
-  if (shouldLog) {
-    std::string texName = "";
-    for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
-      texName += sidedef.middle_texture[i];
-    }
-    OkLogger::info("UV_DEBUG", "Texture: " + texName + ", Wall length: " +
-                                   std::to_string(wallLength) +
-                                   ", Height: " + std::to_string(wallHeight) +
-                                   ", U repeat: " + std::to_string(uRepeat) +
-                                   ", V repeat: " + std::to_string(vRepeat));
+  // For debugging: ensure reasonable UV ranges to prevent extreme values
+  // Clamp to reasonable tiling range (allow up to 10x repeat)
+  if (vTop > 10.0f || vTop < -10.0f) {
+    OkLogger::warning("UV_DEBUG",
+                      "Extreme vTop value detected: " + std::to_string(vTop) +
+                          ", clamping for texture: " + textureName);
+    vTop = std::fmod(vTop, 1.0f);
+    if (vTop < 0)
+      vTop += 1.0f;
   }
+
+  if (vBottom > 10.0f || vBottom < -10.0f) {
+    OkLogger::warning("UV_DEBUG", "Extreme vBottom value detected: " +
+                                      std::to_string(vBottom) +
+                                      ", clamping for texture: " + textureName);
+    vBottom = std::fmod(vBottom, 1.0f);
+    if (vBottom < 0)
+      vBottom += 1.0f;
+  }
+
+  // Debug V coordinates - Check aspect ratio preservation for non-standard
+  // textures
+  float vRepeat            = wallHeight / textureHeight;
+  float textureAspectRatio = textureWidth / textureHeight;
+
+  // Log detailed info for textures with unusual aspect ratios
+  if (textureAspectRatio > 2.5f || textureAspectRatio < 0.4f) {
+    OkLogger::warning("UV_DEBUG",
+                      "NON-STANDARD ASPECT RATIO - Texture: " + textureName +
+                          ", Dimensions: " + std::to_string(textureWidth) +
+                          "x" + std::to_string(textureHeight) +
+                          ", Aspect: " + std::to_string(textureAspectRatio) +
+                          ", Wall: " + std::to_string(wallLength) + "x" +
+                          std::to_string(wallHeight) +
+                          ", U repeat: " + std::to_string(uRepeat) +
+                          ", V repeat: " + std::to_string(vRepeat));
+  }
+
+  // Special logging for very wide textures that might appear blurry
+  if (textureAspectRatio > 4.0f) {
+    OkLogger::warning("UV_DEBUG",
+                      "VERY WIDE TEXTURE DETECTED - " + textureName + " (" +
+                          std::to_string(textureWidth) + "x" +
+                          std::to_string(textureHeight) + ")" +
+                          " - May appear blurry due to extreme aspect ratio: " +
+                          std::to_string(textureAspectRatio));
+  }
+
+  // Only log essential UV info to reduce clutter for standard textures
+  OkLogger::info("UV_DEBUG", "Texture: " + textureName +
+                                 ", Length: " + std::to_string(wallLength) +
+                                 ", U: " + std::to_string(uRepeat) +
+                                 ", V: " + std::to_string(vRepeat));
 
   // Flip V axis for OpenGL
   vBottom = 1.0f - vBottom;
@@ -176,6 +245,17 @@ void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
   vertices.push_back(-z2);
   vertices.push_back(u2);
   vertices.push_back(vTop);
+
+  // Log final wall vertex positions for debugging
+  OkLogger::info(
+      "WALL_DEBUG",
+      "Final wall vertices - Bottom Y: " + std::to_string(wallBottom) +
+          ", Top Y: " + std::to_string(wallTop) +
+          ", X range: " + std::to_string(x1) + " to " + std::to_string(x2) +
+          ", Z range: " + std::to_string(-z1) + " to " + std::to_string(-z2) +
+          ", UV: u1=" + std::to_string(u1) + ", u2=" + std::to_string(u2) +
+          ", vBottom=" + std::to_string(vBottom) +
+          ", vTop=" + std::to_string(vTop));
 
   // Add indices (CCW winding)
   unsigned int baseIndex = vertices.size() / 5 - 4;  // We just added 4 vertices
@@ -213,6 +293,15 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
 
   float levelCenterX = (minX + maxX) / 2.0f;
   float levelCenterY = (minY + maxY) / 2.0f;
+
+  // Log level bounds and center for debugging
+  OkLogger::info("LEVEL_DEBUG", "Level bounds - X: [" + std::to_string(minX) +
+                                    ", " + std::to_string(maxX) + "], Y: [" +
+                                    std::to_string(minY) + ", " +
+                                    std::to_string(maxY) + "]");
+  OkLogger::info("LEVEL_DEBUG",
+                 "Level center - X: " + std::to_string(levelCenterX) +
+                     ", Y: " + std::to_string(levelCenterY));
 
   // Store level center coordinates in global config for use by other modules
   OkConfig::setFloat("level.center.x", levelCenterX);
@@ -254,22 +343,25 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
     }
   }
 
-  // Create a sector group for each sector
-  for (size_t i = 0; i < level.sectors.size(); i++) {
+  // DEBUG: Create only the first THREE sectors to progressively find UV issues
+  int maxSectors = std::min(3, static_cast<int>(level.sectors.size()));
+  for (int i = 0; i < maxSectors; i++) {
     const WAD::Sector &sector = level.sectors[i];
 
     // Generate vertices for this sector
     std::vector<int> sectorVertices =
-        WADGenerate::generateSectorVertices(level, static_cast<int>(i));
+        WADGenerate::generateSectorVertices(level, i);
 
     // Create the sector group
     OkItemGroup *sectorGroup =
-        createSectorGroup(level, sector, static_cast<int>(i), sectorVertices);
+        createSectorGroup(level, sector, i, sectorVertices);
 
     if (sectorGroup) {
       sectorGroups.push_back(sectorGroup);
     }
   }
+  OkLogger::info("SECTOR_DEBUG", "Created first " + std::to_string(maxSectors) +
+                                     " sectors for progressive debugging");
 
   return sectorGroups;
 }
@@ -354,24 +446,6 @@ void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
   float vBottom = vOffset / TEXTURE_HEIGHT;                 // Bottom of texture
   float vTop    = vBottom + (wallHeight / TEXTURE_HEIGHT);  // Top of texture
 
-  // Ensure textureHeight and shouldLog are defined in the correct scope
-  float textureHeight = 128.0f;  // Default DOOM texture height
-
-  // Adjust UV mapping for upper, middle, and lower textures
-  float upperWallHeight =
-      static_cast<float>(sector1.ceiling_height - sector2.ceiling_height);
-  float vUpperRepeat = upperWallHeight / textureHeight;
-  vTop               = vBottom + vUpperRepeat;
-
-  float lowerWallHeight =
-      static_cast<float>(sector2.floor_height - sector1.floor_height);
-  float vLowerRepeat = lowerWallHeight / textureHeight;
-  vTop               = vBottom + vLowerRepeat;
-
-  float middleWallHeight = wallHeight;
-  float vMiddleRepeat    = middleWallHeight / textureHeight;
-  vTop                   = vBottom + vMiddleRepeat;
-
   // Debug UV mapping for textures
 
   OkLogger::info("UV_DEBUG",
@@ -421,6 +495,14 @@ OkItemGroup *
 WADGeometry::createSectorGroup(const WAD::Level  &level,
                                const WAD::Sector &sector, int sectorIndex,
                                const std::vector<int> &sectorVertices) {
+  // Log sector dimensions for debugging
+  int sectorHeight = sector.ceiling_height - sector.floor_height;
+  OkLogger::info("SECTOR_DEBUG",
+                 "Creating sector " + std::to_string(sectorIndex) +
+                     " - Floor: " + std::to_string(sector.floor_height) +
+                     ", Ceiling: " + std::to_string(sector.ceiling_height) +
+                     ", Height: " + std::to_string(sectorHeight));
+
   // Create the sector group
   std::string  groupName   = "sector_" + std::to_string(sectorIndex);
   OkItemGroup *sectorGroup = new OkItemGroup(groupName);
@@ -662,7 +744,7 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
                           (upperHeight + lowerHeight + STANDARD_TEXTURE_HEIGHT);
             upperHeight *= scale;
             lowerHeight *= scale;
-            middleHeight = totalWallHeight - upperHeight - lowerHeight;
+            // middleHeight will be: totalWallHeight - upperHeight - lowerHeight
           }
 
           // Create upper wall section
