@@ -9,11 +9,26 @@
 
 class GUI {
 private:
-  OkItem                  *texturePreview;
+  // GUI elements structure for future expansion
+  struct GUIElement {
+    OkItem     *item;
+    std::string type;
+    bool        visible;
+    bool        initialized;
+  };
+
+  std::vector<GUIElement>  guiElements;
+  OkCamera                *camera;
   std::vector<std::string> textureNames;
   int                      currentTextureIndex;
+  bool                     isInitialized;
 
-  void createTexturePreview();
+  // Helper methods
+  void    initializeGUIElements();
+  void    createTexturePreview(int elementIndex);
+  void    updateTexturePreviewSize(int elementIndex);
+  OkItem *createPolygonWithSize(const std::string &name, float width,
+                                float height);
 
 public:
   GUI(OkCamera *camera);
