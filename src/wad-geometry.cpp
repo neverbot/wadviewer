@@ -623,14 +623,131 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
       }
       // One-sided linedef case
       else {
-        std::string textureName =
+        // For one-sided walls, we need to handle upper, middle, and lower
+        // textures Since there's no adjacent sector, we use the full sector
+        // height and split it based on texture availability and standard DOOM
+        // conventions
+
+        float wallFloor       = static_cast<float>(sector.floor_height);
+        float wallCeiling     = static_cast<float>(sector.ceiling_height);
+        float totalWallHeight = wallCeiling - wallFloor;
+
+        // Standard DOOM texture height for calculating splits
+        const float STANDARD_TEXTURE_HEIGHT = 128.0f;
+
+        // Check which textures are defined
+        std::string upperTexName =
+            OkStrings::trimFixedString(rightSide.upper_texture, 8);
+        std::string middleTexName =
             OkStrings::trimFixedString(rightSide.middle_texture, 8);
-        if (!textureName.empty() && textureName != "-") {
-          GeometryGroup &group = geometryGroups[textureName];
-          group.textureName    = textureName;
-          createWallSection(v1, v2, sector.floor_height, sector.ceiling_height,
-                            rightSide, group.vertices, group.indices);
+        std::string lowerTexName =
+            OkStrings::trimFixedString(rightSide.lower_texture, 8);
+
+        bool hasUpper  = !upperTexName.empty() && upperTexName != "-";
+        bool hasMiddle = !middleTexName.empty() && middleTexName != "-";
+        bool hasLower  = !lowerTexName.empty() && lowerTexName != "-";
+
+        // Calculate height splits based on which textures are present
+        if (hasUpper && hasMiddle && hasLower) {
+          // All three textures: split wall into three equal parts or use
+          // texture-based proportions
+          float upperHeight  = STANDARD_TEXTURE_HEIGHT;
+          float lowerHeight  = STANDARD_TEXTURE_HEIGHT;
+          float middleHeight = totalWallHeight - upperHeight - lowerHeight;
+
+          // Ensure middle section is not negative
+          if (middleHeight < 0.0f) {
+            // If wall is too short, scale proportionally
+            float scale = totalWallHeight /
+                          (upperHeight + lowerHeight + STANDARD_TEXTURE_HEIGHT);
+            upperHeight *= scale;
+            lowerHeight *= scale;
+            middleHeight = totalWallHeight - upperHeight - lowerHeight;
+          }
+
+          // Create upper wall section
+          GeometryGroup &upperGroup = geometryGroups[upperTexName];
+          upperGroup.textureName    = upperTexName;
+          createWallSection(v1, v2, wallCeiling - upperHeight, wallCeiling,
+                            rightSide, upperGroup.vertices, upperGroup.indices);
+
+          // Create middle wall section
+          GeometryGroup &middleGroup = geometryGroups[middleTexName];
+          middleGroup.textureName    = middleTexName;
+          createWallSection(v1, v2, wallFloor + lowerHeight,
+                            wallCeiling - upperHeight, rightSide,
+                            middleGroup.vertices, middleGroup.indices);
+
+          // Create lower wall section
+          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
+          lowerGroup.textureName    = lowerTexName;
+          createWallSection(v1, v2, wallFloor, wallFloor + lowerHeight,
+                            rightSide, lowerGroup.vertices, lowerGroup.indices);
+        } else if (hasUpper && hasMiddle) {
+          // Upper and middle: upper takes standard height, middle takes the
+          // rest
+          float upperHeight =
+              std::min(STANDARD_TEXTURE_HEIGHT, totalWallHeight * 0.5f);
+
+          GeometryGroup &upperGroup = geometryGroups[upperTexName];
+          upperGroup.textureName    = upperTexName;
+          createWallSection(v1, v2, wallCeiling - upperHeight, wallCeiling,
+                            rightSide, upperGroup.vertices, upperGroup.indices);
+
+          GeometryGroup &middleGroup = geometryGroups[middleTexName];
+          middleGroup.textureName    = middleTexName;
+          createWallSection(v1, v2, wallFloor, wallCeiling - upperHeight,
+                            rightSide, middleGroup.vertices,
+                            middleGroup.indices);
+        } else if (hasMiddle && hasLower) {
+          // Middle and lower: lower takes standard height, middle takes the
+          // rest
+          float lowerHeight =
+              std::min(STANDARD_TEXTURE_HEIGHT, totalWallHeight * 0.5f);
+
+          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
+          lowerGroup.textureName    = lowerTexName;
+          createWallSection(v1, v2, wallFloor, wallFloor + lowerHeight,
+                            rightSide, lowerGroup.vertices, lowerGroup.indices);
+
+          GeometryGroup &middleGroup = geometryGroups[middleTexName];
+          middleGroup.textureName    = middleTexName;
+          createWallSection(v1, v2, wallFloor + lowerHeight, wallCeiling,
+                            rightSide, middleGroup.vertices,
+                            middleGroup.indices);
+        } else if (hasUpper && hasLower) {
+          // Upper and lower only: split wall in half
+          float halfHeight = totalWallHeight * 0.5f;
+
+          GeometryGroup &upperGroup = geometryGroups[upperTexName];
+          upperGroup.textureName    = upperTexName;
+          createWallSection(v1, v2, wallFloor + halfHeight, wallCeiling,
+                            rightSide, upperGroup.vertices, upperGroup.indices);
+
+          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
+          lowerGroup.textureName    = lowerTexName;
+          createWallSection(v1, v2, wallFloor, wallFloor + halfHeight,
+                            rightSide, lowerGroup.vertices, lowerGroup.indices);
+        } else if (hasUpper) {
+          // Upper texture only: use full wall height
+          GeometryGroup &upperGroup = geometryGroups[upperTexName];
+          upperGroup.textureName    = upperTexName;
+          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
+                            upperGroup.vertices, upperGroup.indices);
+        } else if (hasLower) {
+          // Lower texture only: use full wall height
+          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
+          lowerGroup.textureName    = lowerTexName;
+          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
+                            lowerGroup.vertices, lowerGroup.indices);
+        } else if (hasMiddle) {
+          // Middle texture only: use full wall height (original behavior)
+          GeometryGroup &middleGroup = geometryGroups[middleTexName];
+          middleGroup.textureName    = middleTexName;
+          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
+                            middleGroup.vertices, middleGroup.indices);
         }
+        // If no textures are defined, create no wall sections
       }
     }
 
