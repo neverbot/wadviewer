@@ -22,15 +22,13 @@ private:
   static std::vector<OkItem *>
   createSectorWalls(const WAD::Level &level, const WAD::Sector &sector,
                     int sectorIndex, const std::vector<int> &sectorVertices);
-  static void createWallSection(
-      const WAD::Vertex &vertex1,
-      const WAD::Vertex &vertex2,
-      float bottomHeight,
-      float topHeight,
-      const WAD::Sidedef &sidedef,
-      const std::string &textureName,
-      std::vector<float> &vertices,
-      std::vector<unsigned int> &indices);
+  // Create a wall section between two vertices with given heights
+  // and sidedef information
+  static void createWallSection(const WAD::Vertex &vertex1,
+                                const WAD::Vertex &vertex2, float bottomHeight,
+                                float topHeight, const WAD::Sidedef &sidedef,
+                                std::vector<float>        &vertices,
+                                std::vector<unsigned int> &indices);
 
   static void
   createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
