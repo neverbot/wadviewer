@@ -117,12 +117,33 @@ xmake run wadviewer wads/doom1.wad E1M1
   - `wad-converter.hpp/cpp`: WAD to 3D geometry conversion.
 - `wads/`: Example WAD files.
 
+## Agent control (MCP)
+
+The Okinawa engine ships an optional MCP server, so an agent (e.g. Claude
+Code) can connect to a running wadviewer and visually inspect what it is
+rendering. Launch the viewer with `--mcp`:
+
+```bash
+xmake run wadviewer wads/doom1.wad E1M1 --mcp
+```
+
+It logs `MCP server listening on http://127.0.0.1:8765/mcp`. Then register
+it in Claude Code:
+
+```bash
+claude mcp add --transport http okinawa http://127.0.0.1:8765/mcp
+```
+
+The `view_frame` tool returns the current rendered frame as an image. The
+server is compiled in by default (debug builds); exclude it with
+`xmake f --mcp=n`.
+
 ## Dependencies
 
 Third-party dependencies are managed by xmake (xrepo) and fetched
-automatically; the engine is built from a sibling source checkout:
+automatically; the engine is built from source via a git submodule:
 
-- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (built from source, sibling checkout).
+- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (built from source, git submodule).
 - [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
 - [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
 - [nlohmann_json](https://github.com/nlohmann/json): JSON parsing.

@@ -341,12 +341,13 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
 
     // clang-format off
-    if (argc < 2 || argc > 5) {
-      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose]\n";
+    if (argc < 2 || argc > 6) {
+      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose] [--mcp]\n";
       std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
       std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
       std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
       std::cout << "  --verbose   : Optional. Enable verbose debug output\n";
+      std::cout << "  --mcp       : Optional. Start the MCP server (http://127.0.0.1:8765/mcp) for agent control\n";
       return 1;
     }
     // clang-format on
@@ -354,13 +355,16 @@ int main(int argc, char *argv[]) {
     // WADFormat   format = WADFormat::WAD;  // Default format
     std::string contentFile;
     std::string levelName = "";     // Empty string means use first level
-    bool        verbose   = false;  // Default: not verbose
+    bool        verbose    = false;  // Default: not verbose
+    bool        mcpEnabled  = false;  // Enable the in-engine MCP server
 
-    // Check for verbose flag in all arguments
+    // Scan all arguments for optional flags.
     for (int i = 1; i < argc; i++) {
-      if (std::string(argv[i]) == "--verbose") {
+      std::string arg = argv[i];
+      if (arg == "--verbose") {
         verbose = true;
-        break;
+      } else if (arg == "--mcp") {
+        mcpEnabled = true;
       }
     }
 
@@ -527,6 +531,12 @@ int main(int argc, char *argv[]) {
 
     OkLogger::info("Scene",
                    "Object count: " + std::to_string(scene->getObjectCount()));
+
+    // Enable the MCP server if requested (--mcp), so an external agent can
+    // connect over local HTTP and observe/drive the app while it runs.
+    if (mcpEnabled) {
+      OkCore::enableMcpServer();
+    }
 
     // Verify engine is properly initialized before starting the loop
     if (OkCore::getWindow() != nullptr && OkCore::getShaderProgram() != 0) {
