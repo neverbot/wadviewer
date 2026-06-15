@@ -47,6 +47,10 @@ build/
 build-release/
 !build/.gitkeep
 
+# xmake
+.xmake/
+compile_commands.json
+
 # executable file
 wadviewer
 wadviewer*

@@ -15,100 +15,67 @@ A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://g
 
 ## Tools used
 
+- [xmake](https://xmake.io/): A cross-platform build utility with a built-in package manager.
 - [clang](https://clang.llvm.org/): A compiler for C and C++ languages.
-- [cmake](https://cmake.org/): A cross-platform build system generator.
-- [conan](https://conan.io/): A package manager for C and C++ libraries.
 
 ## Building from Source
 
-The executable will be created in `build/bin/wadviewer`.
+The project is built with [xmake](https://xmake.io), which also manages
+the third-party dependencies through its package manager (xrepo). There
+is no separate dependency-installation step.
 
 ### Prerequisites
 
-The project depends on the Okinawa engine, which must be built and installed as a local Conan package first:
+The viewer is built against the [Okinawa engine](https://github.com/okinawa-dev/okinawa.cpp),
+which is vendored as a **git submodule** at `./okinawa.cpp` and built from
+source. Clone the repository recursively so the engine comes with it:
 
 ```bash
-# Clone and create the Okinawa package
-git clone https://github.com/okinawa-dev/okinawa.cpp.git
-cd okinawa.cpp
-conan create . --build=missing
-cd ..
+git clone --recursive https://github.com/neverbot/wadviewer.git
 ```
 
-#### Developing the engine alongside wadviewer (Conan editable mode)
-
-If you are actively editing the Okinawa engine, you can avoid
-re-running `conan create` on every change by putting it in **editable
-mode**, so wadviewer links directly against the engine source tree:
+If you already cloned without `--recursive`, fetch the engine with:
 
 ```bash
-# Mark the engine editable (once)
-conan editable add ../okinawa.cpp
-
-# Build the engine WITHOUT tests (coverage instrumentation would
-# otherwise leak into the static lib and break the consumer link)
-cd ../okinawa.cpp
-conan install . --output-folder=build -s build_type=Debug --build=missing
-cmake --preset debug -DOKINAWA_BUILD_TESTS=OFF
-cmake --build --preset debug
-cd ../wadviewer
-
-# Then build wadviewer as usual; iterate: edit engine -> rebuild engine -> rebuild wadviewer
-# To go back to the packaged engine:
-#   conan editable remove --refs=okinawa/0.1.0
+git submodule update --init
 ```
 
-### Debug Build
+xmake builds the engine from the submodule automatically; there is no
+binary package step. To work on the engine, edit it inside the
+`okinawa.cpp/` submodule and rebuild wadviewer — the changes are picked
+up directly.
+
+### Build
 
 ```bash
-# Clone the repository
-git clone https://github.com/neverbot/wadviewer.git
 cd wadviewer
 
-# Install dependencies using Conan
-conan install . --output-folder=build -s build_type=Debug --build=missing
+# Build (debug by default). On the first run xmake downloads and builds
+# the dependencies automatically.
+xmake
 
-# Configure with CMake
-cmake --preset debug
-
-# Build the project
-cmake --build --preset debug
-```
-
-### Release Build
-
-```bash
-# Clone the repository (if not already done)
-git clone https://github.com/neverbot/wadviewer.git
-cd wadviewer
-
-# Install dependencies using Conan
-conan install . --output-folder=build -s build_type=Release --build=missing
-
-# Configure with CMake
-cmake --preset release
-
-# Build the project
-cmake --build --preset release
+# Release build
+xmake f -m release && xmake
 ```
 
 ## Usage
 
-The program can be run in these ways:
+Run through xmake (it runs from the project root, where the `wads/`
+folder lives):
 
 ```bash
 # Using default WAD format
-./build/bin/wadviewer <content_file> [<level_name>]
+xmake run wadviewer <content_file> [<level_name>]
 
 # Specifying format explicitly
-./build/bin/wadviewer -wad <content_file> [<level_name>]
-./build/bin/wadviewer -json <content_file> [<level_name>]
-./build/bin/wadviewer -dsl <content_file> [<level_name>]
+xmake run wadviewer -wad <content_file> [<level_name>]
+xmake run wadviewer -json <content_file> [<level_name>]
+xmake run wadviewer -dsl <content_file> [<level_name>]
 ```
 
-Example: 
+Example:
 ```bash
-./build/bin/wadviewer wads/doom1.wad E1M1
+xmake run wadviewer wads/doom1.wad E1M1
 ```
 
 ### Command Line Arguments
@@ -152,9 +119,10 @@ Example:
 
 ## Dependencies
 
-All dependencies are managed through Conan:
+Third-party dependencies are managed by xmake (xrepo) and fetched
+automatically; the engine is built from a sibling source checkout:
 
-- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (local package).
+- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (built from source, sibling checkout).
 - [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
 - [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
 - [nlohmann_json](https://github.com/nlohmann/json): JSON parsing.
