@@ -134,8 +134,17 @@ it in Claude Code:
 claude mcp add --transport http okinawa http://127.0.0.1:8765/mcp
 ```
 
-The `view_frame` tool returns the current rendered frame as an image. The
-server is compiled in by default (debug builds); exclude it with
+Tools exposed by the server:
+
+- `view_frame` — return the current frame as an image (for the agent).
+- `screenshot` — write the frame to a PNG file (for a human).
+- `press_key` / `press_keys` — hold a key (or several) for a duration to
+  drive the avatar (W/A/S/D move, 1-9 switch camera, SPACE/T/R/F actions).
+- `look` — rotate the active camera by yaw/pitch degrees.
+- `set_camera_pose` — teleport/orient the active camera directly.
+- `get_state` — camera pose, fps, scene counts, window size, memory.
+
+The server is compiled in by default (debug builds); exclude it with
 `xmake f --mcp=n`.
 
 ## Dependencies
