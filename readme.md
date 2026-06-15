@@ -35,6 +35,29 @@ conan create . --build=missing
 cd ..
 ```
 
+#### Developing the engine alongside wadviewer (Conan editable mode)
+
+If you are actively editing the Okinawa engine, you can avoid
+re-running `conan create` on every change by putting it in **editable
+mode**, so wadviewer links directly against the engine source tree:
+
+```bash
+# Mark the engine editable (once)
+conan editable add ../okinawa.cpp
+
+# Build the engine WITHOUT tests (coverage instrumentation would
+# otherwise leak into the static lib and break the consumer link)
+cd ../okinawa.cpp
+conan install . --output-folder=build -s build_type=Debug --build=missing
+cmake --preset debug -DOKINAWA_BUILD_TESTS=OFF
+cmake --build --preset debug
+cd ../wadviewer
+
+# Then build wadviewer as usual; iterate: edit engine -> rebuild engine -> rebuild wadviewer
+# To go back to the packaged engine:
+#   conan editable remove --refs=okinawa/0.1.0
+```
+
 ### Debug Build
 
 ```bash
