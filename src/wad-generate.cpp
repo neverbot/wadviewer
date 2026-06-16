@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -256,6 +257,42 @@ bool pointInLoop(const WAD::Level &level, double px, double py,
   return inside;
 }
 
+// Split one chained boundary loop into simple sub-loops at any vertex it
+// revisits. Thin/pinched sectors (e.g. a step ledge whose arms meet at a
+// single vertex) chain into a weakly-simple loop that passes through the pinch
+// vertices twice; ear-clipping needs each piece to be a simple polygon. When a
+// vertex reappears, the path since its first occurrence is a closed simple
+// sub-loop, which we cut out (the standard mesh-DOOM sector decomposition).
+std::vector<std::vector<int> > splitSimpleLoops(const std::vector<int> &loop) {
+  std::vector<std::vector<int> > result;
+  std::vector<int>               path;
+  std::map<int, int>             pos;  // vertex index -> position in path
+  for (size_t i = 0; i < loop.size(); i++) {
+    int                          v  = loop[i];
+    std::map<int, int>::iterator it = pos.find(v);
+    if (it != pos.end()) {
+      int              start = it->second;
+      std::vector<int> sub(path.begin() + start, path.end());
+      if (sub.size() >= 3) {
+        result.push_back(sub);
+      }
+      for (size_t k = start; k < path.size(); k++) {
+        pos.erase(path[k]);
+      }
+      path.resize(start);
+      pos[v] = static_cast<int>(path.size());
+      path.push_back(v);
+    } else {
+      pos[v] = static_cast<int>(path.size());
+      path.push_back(v);
+    }
+  }
+  if (path.size() >= 3) {
+    result.push_back(path);
+  }
+  return result;
+}
+
 // Build the ordered boundary loops of a sector by chaining its linedef edges.
 // A linedef whose front (right) sidedef is the sector contributes the edge
 // start->end; whose back (left) sidedef is the sector contributes end->start.
@@ -316,7 +353,10 @@ std::vector<std::vector<int> > buildSectorLoops(const WAD::Level &level,
       cur = next;
     }
     if (closed && loop.size() >= 3) {
-      loops.push_back(loop);
+      std::vector<std::vector<int> > simples = splitSimpleLoops(loop);
+      for (size_t s = 0; s < simples.size(); s++) {
+        loops.push_back(simples[s]);
+      }
     }
   }
   return loops;
