@@ -153,6 +153,13 @@ OkItem *WADGenerate::generateSectorCeiling(
     return nullptr;
   }
 
+  // F_SKY1 is DOOM's sky marker: such a sector is open to the sky and DOOM
+  // draws the sky behind it, never a solid ceiling flat. Omit the ceiling so
+  // open-air rooms stay open (a real sky-dome could replace this later).
+  if (ceilingTexName == "F_SKY1") {
+    return nullptr;
+  }
+
   // Check if we have enough vertices
   if (sectorVertices.size() < 3) {
     return nullptr;
@@ -411,6 +418,19 @@ bridgeHoleIntoOuter(const WAD::Level &level, const std::vector<int> &outer,
       if (bridgeBlocked(level, outer[o], hole[h], obstacles)) {
         continue;
       }
+      // Crossing no edge is not enough: a segment can run OUTSIDE the outer
+      // boundary (through a concavity) or across the hole without crossing an
+      // edge, which makes the spliced ring self-intersect and ear-clipping
+      // leave large gaps. Require the bridge midpoint to lie inside the outer
+      // loop and outside the hole, so the bridge is genuinely interior.
+      double mx = 0.5 * (static_cast<double>(level.vertices[outer[o]].x) +
+                         static_cast<double>(level.vertices[hole[h]].x));
+      double my = 0.5 * (static_cast<double>(level.vertices[outer[o]].y) +
+                         static_cast<double>(level.vertices[hole[h]].y));
+      if (!pointInLoop(level, mx, my, outer) ||
+          pointInLoop(level, mx, my, hole)) {
+        continue;
+      }
       std::vector<int> result;
       for (size_t k = 0; k <= o; k++) {
         result.push_back(outer[k]);
@@ -481,6 +501,14 @@ void earClip(const WAD::Level &level, const std::vector<int> &ring,
         }
         double px = static_cast<double>(level.vertices[ring[pk]].x);
         double py = static_cast<double>(level.vertices[ring[pk]].y);
+        // A hole bridge introduces duplicate vertices (same coordinates, a
+        // different ring position). One of them would test as lying ON this
+        // ear and wrongly veto it, stalling the clip at the bridge and leaving
+        // the rest of the polygon untriangulated. Ignore coincident points.
+        if ((px == ax && py == ay) || (px == bx && py == by) ||
+            (px == cx && py == cy)) {
+          continue;
+        }
         double d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
         double d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
         double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
