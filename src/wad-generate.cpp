@@ -237,28 +237,6 @@ void WADGenerate::createSectorGeometry(const WAD::Level       &level,
   float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
                          : static_cast<float>(sector.ceiling_height) * SCALE;
 
-  // Calculate sector bounds for texture mapping
-  float minX = std::numeric_limits<float>::max();
-  float minY = std::numeric_limits<float>::max();
-  float maxX = std::numeric_limits<float>::lowest();
-  float maxY = std::numeric_limits<float>::lowest();
-
-  // First pass - get bounds for texture coordinates
-  for (size_t i = 0; i < sectorVertices.size(); i++) {
-    if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
-      continue;  // Skip invalid vertex indices
-    }
-
-    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    float              worldX = static_cast<float>(vertex.x);
-    float              worldY = static_cast<float>(vertex.y);
-
-    minX = std::min(minX, worldX);
-    maxX = std::max(maxX, worldX);
-    minY = std::min(minY, worldY);
-    maxY = std::max(maxY, worldY);
-  }
-
   // Create vertices with proper texture coordinates
   unsigned int baseIndex = 0;  // Start from 0 since this is a new item
 
@@ -272,13 +250,11 @@ void WADGenerate::createSectorGeometry(const WAD::Level       &level,
     float x = (static_cast<float>(vertex.x) - levelCenterX) * SCALE;
     float z = (static_cast<float>(vertex.y) - levelCenterY) * SCALE;
 
-    // Calculate UV coordinates based on world position
-    float u = fmod((static_cast<float>(vertex.x) - minX) / TEXTURE_SIZE, 1.0f);
-    float v = fmod((static_cast<float>(vertex.y) - minY) / TEXTURE_SIZE, 1.0f);
-
-    if (!isFloor) {
-      v = 1.0f - v;  // Flip V coordinate for ceiling
-    }
+    // Flats tile on the absolute world grid (origin 0,0) so adjacent sectors
+    // align, matching vanilla DOOM. GL_REPEAT tiles, so emit raw UVs (no
+    // per-vertex fmod, which would smear the texture across tile boundaries).
+    float u = static_cast<float>(vertex.x) / TEXTURE_SIZE;
+    float v = static_cast<float>(vertex.y) / TEXTURE_SIZE;
 
     vertices.push_back(x);
     vertices.push_back(height);

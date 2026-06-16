@@ -234,7 +234,9 @@ void positionCameraForLevel(OkCamera                         *camera,
   camera->setRotation(pitch, yaw, 0.0f);
 
   // Set up perspective to view entire level
-  float fov       = 45.0f;
+  // DOOM uses a 90 degree HORIZONTAL FOV; with glm's vertical FOV at a 4:3
+  // aspect that is ~74 degrees. (45 was far too narrow / zoomed in.)
+  float fov       = 74.0f;
   float nearPlane = 0.1f;
   float farPlane  = distance * 4.0f;  // Make sure we can see the whole level
   camera->setPerspective(fov, nearPlane, farPlane);
@@ -463,7 +465,8 @@ int main(int argc, char *argv[]) {
       povCamera->setMaxVelocity(cameraSpeed * 0.5f);
       povCamera->setPosition(*playerStart);
       povCamera->setRotation(0.0f, 0.0f, 0.0f);
-      povCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+      // DOOM-like field of view: 90 deg horizontal ~= 74 deg vertical at 4:3.
+      povCamera->setPerspective(74.0f, 0.1f, 2000.0f);
       // ************************************************************************
 
       // ************************************************************************
@@ -477,7 +480,7 @@ int main(int argc, char *argv[]) {
       originCamera->setMaxVelocity(cameraSpeed * 0.5f);
       originCamera->setPosition(0.0f, 0.0f, 0.0f);
       originCamera->setRotation(0.0f, 0.0f, 0.0f);
-      originCamera->setPerspective(45.0f, 0.1f, 2000.0f);
+      originCamera->setPerspective(74.0f, 0.1f, 2000.0f);
       // ************************************************************************
 
       // Initialize GUI

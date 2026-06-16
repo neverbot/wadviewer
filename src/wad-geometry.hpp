@@ -4,6 +4,8 @@
 #include "./wad.hpp"
 #include "okinawa/item/group.hpp"
 #include "okinawa/item/item.hpp"
+#include <cstdint>
+#include <string>
 #include <vector>
 
 class WADGeometry {
@@ -22,19 +24,17 @@ private:
   static std::vector<OkItem *>
   createSectorWalls(const WAD::Level &level, const WAD::Sector &sector,
                     int sectorIndex, const std::vector<int> &sectorVertices);
-  // Create a wall section between two vertices with given heights
-  // and sidedef information
+  // Create a wall quad with DOOM-correct texture mapping: real texture
+  // dimensions (looked up by name) + linedef pegging.
+  // sectionType: 0 = upper, 1 = lower, 2 = middle (one- or two-sided).
+  // frontCeil is the front sector's ceiling height (used by lower-unpegged).
   static void createWallSection(const WAD::Vertex &vertex1,
-                                const WAD::Vertex &vertex2, float bottomHeight,
-                                float topHeight, const WAD::Sidedef &sidedef,
+                                const WAD::Vertex &vertex2, float wallBottom,
+                                float wallTop, const std::string &textureName,
+                                int sectionType, float frontCeil,
+                                uint16_t flags, const WAD::Sidedef &sidedef,
                                 std::vector<float>        &vertices,
                                 std::vector<unsigned int> &indices);
-
-  static void
-  createWallFace(const WAD::Vertex &vertex1, const WAD::Vertex &vertex2,
-                 const WAD::Sector &sector1, const WAD::Sector &sector2,
-                 const WAD::Sidedef &sidedef, std::vector<float> &vertices,
-                 std::vector<unsigned int> &indices);
 };
 
 #endif  // WAD_VIEWER_WAD_GEOMETRY_HPP

@@ -18,252 +18,97 @@
 #include <vector>
 
 void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
-                                    const WAD::Vertex &vertex2,
-                                    float bottomHeight, float topHeight,
-                                    const WAD::Sidedef        &sidedef,
+                                    const WAD::Vertex &vertex2, float wallBottom,
+                                    float wallTop, const std::string &textureName,
+                                    int sectionType, float frontCeil,
+                                    uint16_t flags, const WAD::Sidedef &sidedef,
                                     std::vector<float>        &vertices,
                                     std::vector<unsigned int> &indices) {
-  // CRITICAL DEBUG: Log wall creation with raw DOOM values
-  OkLogger::info("WALL_SECTION",
-                 "Creating wall - Bottom: " + std::to_string(bottomHeight) +
-                     ", Top: " + std::to_string(topHeight) + ", Raw Height: " +
-                     std::to_string(topHeight - bottomHeight) + "\n");
-
-  // Get level center coordinates from global config
-  float       levelCenterX = OkConfig::getFloat("level.center.x");
-  float       levelCenterY = OkConfig::getFloat("level.center.y");
-  const float SCALE        = 1.0f;
-
-  // Calculate normalized positions
-  float x1 = (static_cast<float>(vertex1.x) - levelCenterX) * SCALE;
-  float z1 = (static_cast<float>(vertex1.y) - levelCenterY) * SCALE;
-  float x2 = (static_cast<float>(vertex2.x) - levelCenterX) * SCALE;
-  float z2 = (static_cast<float>(vertex2.y) - levelCenterY) * SCALE;
-
-  // Calculate wall dimensions
-  float wallBottom = bottomHeight * SCALE;
-  float wallTop    = topHeight * SCALE;
-  float wallHeight = wallTop - wallBottom;
-
-  // Enhanced logging for wall dimensions debugging
-  OkLogger::info("WALL_DEBUG",
-                 "Wall dimensions - Bottom: " + std::to_string(bottomHeight) +
-                     " -> " + std::to_string(wallBottom) +
-                     ", Top: " + std::to_string(topHeight) + " -> " +
-                     std::to_string(wallTop) +
-                     ", Height: " + std::to_string(wallHeight) +
-                     ", Scale: " + std::to_string(SCALE));
-
-  if (wallHeight <= 0.0f) {
-    OkLogger::warning("WALL_DEBUG",
-                      "Skipping wall with zero or negative height: " +
-                          std::to_string(wallHeight));
+  if (wallTop - wallBottom <= 0.0f) {
     return;
   }
 
-  // Calculate real-world wall length (before scaling)
+  float levelCenterX = OkConfig::getFloat("level.center.x");
+  float levelCenterY = OkConfig::getFloat("level.center.y");
+
+  float x1 = static_cast<float>(vertex1.x) - levelCenterX;
+  float z1 = static_cast<float>(vertex1.y) - levelCenterY;
+  float x2 = static_cast<float>(vertex2.x) - levelCenterX;
+  float z2 = static_cast<float>(vertex2.y) - levelCenterY;
+
+  // Real dimensions of the texture actually applied to this section (fall back
+  // to the common DOOM size only if it can't be resolved).
+  float      textureWidth  = 64.0f;
+  float      textureHeight = 128.0f;
+  OkTexture *texture = OkTextureHandler::getInstance()->getTexture(textureName);
+  if (texture != nullptr) {
+    textureWidth  = static_cast<float>(texture->getWidth());
+    textureHeight = static_cast<float>(texture->getHeight());
+  }
+
   float wallLength =
       sqrtf(powf(static_cast<float>(vertex2.x - vertex1.x), 2.0f) +
             powf(static_cast<float>(vertex2.y - vertex1.y), 2.0f));
 
-  // Log wall geometry details
-  OkLogger::info("WALL_DEBUG",
-                 "Wall geometry - Length: " + std::to_string(wallLength) +
-                     ", Vertices: (" + std::to_string(vertex1.x) + "," +
-                     std::to_string(vertex1.y) + ") to (" +
-                     std::to_string(vertex2.x) + "," +
-                     std::to_string(vertex2.y) + ")");
+  // Horizontal U: x_offset plus distance along the wall, in texture widths.
+  float xOffset = static_cast<float>(sidedef.x_offset);
+  float u1      = xOffset / textureWidth;
+  float u2      = u1 + wallLength / textureWidth;
 
-  // Default DOOM texture constants (fallback values)
-  float textureWidth  = 64.0f;
-  float textureHeight = 128.0f;
+  // Vertical: world height of the texture's top row (row 0) following DOOM
+  // pegging (linedef ML_DONTPEGTOP / ML_DONTPEGBOTTOM).
+  const uint16_t ML_DONTPEGTOP    = 0x0008;
+  const uint16_t ML_DONTPEGBOTTOM = 0x0010;
+  bool           dontPegTop       = (flags & ML_DONTPEGTOP) != 0;
+  bool           dontPegBottom    = (flags & ML_DONTPEGBOTTOM) != 0;
 
-  // Try to get actual texture dimensions from the texture handler
-  // We need to extract texture name from sidedef to get proper dimensions
-  std::string textureName = "";
-  for (int i = 0; i < 8 && sidedef.middle_texture[i] != '\0'; i++) {
-    textureName += sidedef.middle_texture[i];
-  }
-
-  OkTexture *texture = OkTextureHandler::getInstance()->getTexture(textureName);
-  if (texture) {
-    textureWidth  = static_cast<float>(texture->getWidth());
-    textureHeight = static_cast<float>(texture->getHeight());
-    OkLogger::info("WALL_DEBUG",
-                   "Using texture '" + textureName +
-                       "' dimensions: " + std::to_string(textureWidth) + "x" +
-                       std::to_string(textureHeight));
+  float texTopWorld;
+  if (sectionType == 0) {
+    // Upper: bottom-pegged by default; DONTPEGTOP pegs it to the top.
+    texTopWorld = dontPegTop ? wallTop : (wallBottom + textureHeight);
+  } else if (sectionType == 1) {
+    // Lower: top-of-section by default; DONTPEGBOTTOM pegs it to the ceiling.
+    texTopWorld = dontPegBottom ? frontCeil : wallTop;
   } else {
-    OkLogger::info("WALL_DEBUG", "Using default texture dimensions for '" +
-                                     textureName +
-                                     "': " + std::to_string(textureWidth) +
-                                     "x" + std::to_string(textureHeight));
+    // Middle: top-pegged by default; DONTPEGBOTTOM pegs it to the bottom.
+    texTopWorld = dontPegBottom ? (wallBottom + textureHeight) : wallTop;
   }
+  // Sidedef y_offset (DOOM rowoffset) is added to the texture anchor, like
+  // r_segs.c does (rw_*texturemid += rowoffset): a positive offset raises the
+  // texture's top-row world height, scrolling the texture upward on the wall.
+  texTopWorld += static_cast<float>(sidedef.y_offset);
 
-  // Get texture offsets from sidedef
-  float uOffset = static_cast<float>(sidedef.x_offset);
-  float vOffset = static_cast<float>(sidedef.y_offset);
+  // OpenGL V (engine convention: smaller V = texture top). May exceed [0,1];
+  // textures use GL_REPEAT, so they tile.
+  float vTop    = (texTopWorld - wallTop) / textureHeight;
+  float vBottom = (texTopWorld - wallBottom) / textureHeight;
 
-  // Calculate U coordinates - texture repeats horizontally based on wall length
-  float uOffsetNormalized = uOffset / textureWidth;
-  float uRepeat           = wallLength / textureWidth;
-  float u1                = uOffsetNormalized;
-  float u2                = u1 + uRepeat;
-
-  // DOOM V coordinate system to OpenGL conversion:
-  //
-  // DOOM texture coordinate system:
-  // - V=0 is at the TOP of the texture image
-  // - Textures are anchored at the BOTTOM of the wall
-  // - Positive vOffset moves texture DOWN relative to wall bottom
-  // - V increases downward in the texture image
-  //
-  // OpenGL texture coordinate system:
-  // - V=0 is at the BOTTOM of the texture image
-  // - V=1 is at the TOP of the texture image
-  // - V increases upward in the texture image
-
-  // Calculate texture coordinates for DOOM->OpenGL conversion
-  float wallHeightInTexture = wallHeight / textureHeight;
-  float vOffsetInTexture    = vOffset / textureHeight;
-
-  // DOOM texture anchoring algorithm:
-  // 1. Texture is anchored at wall bottom
-  // 2. vOffset shifts the texture downward (positive = texture moves down)
-  // 3. We sample from texture starting at vOffset pixels from texture bottom
-
-  // In DOOM texture space (normalized coordinates where 0=top, 1=bottom):
-  // Wall bottom samples from: 1.0 - vOffsetInTexture (texture bottom + offset)
-  // Wall top samples from: 1.0 - vOffsetInTexture - wallHeightInTexture
-
-  float vDoomBottom = 1.0f - vOffsetInTexture;  // Wall bottom in DOOM coords
-  float vDoomTop =
-      vDoomBottom - wallHeightInTexture;  // Wall top in DOOM coords
-
-  // Convert DOOM V coordinates to OpenGL V coordinates (flip Y axis)
-  // DOOM V=0 (texture top) -> OpenGL V=1
-  // DOOM V=1 (texture bottom) -> OpenGL V=0
-  float vBottom = 1.0f - vDoomBottom;  // Wall bottom in OpenGL
-  float vTop    = 1.0f - vDoomTop;     // Wall top in OpenGL
-
-  // Handle texture wrapping for walls taller than texture
-  if (wallHeight > textureHeight) {
-    // Allow V coordinates to extend beyond [0,1] for tiling
-    vTop = vBottom + wallHeightInTexture;
-  }
-
-  // Handle negative vOffset (texture shifted up)
-  if (vOffset < 0.0f) {
-    float shift = (-vOffset) / textureHeight;
-    vBottom += shift;
-    vTop += shift;
-  }
-
-  // For debugging: ensure reasonable UV ranges to prevent extreme values
-  // Clamp to reasonable tiling range (allow up to 10x repeat)
-  if (vTop > 10.0f || vTop < -10.0f) {
-    OkLogger::warning("UV_DEBUG",
-                      "Extreme vTop value detected: " + std::to_string(vTop) +
-                          ", clamping for texture: " + textureName);
-    vTop = std::fmod(vTop, 1.0f);
-    if (vTop < 0)
-      vTop += 1.0f;
-  }
-
-  if (vBottom > 10.0f || vBottom < -10.0f) {
-    OkLogger::warning("UV_DEBUG", "Extreme vBottom value detected: " +
-                                      std::to_string(vBottom) +
-                                      ", clamping for texture: " + textureName);
-    vBottom = std::fmod(vBottom, 1.0f);
-    if (vBottom < 0)
-      vBottom += 1.0f;
-  }
-
-  // Debug V coordinates - Check aspect ratio preservation for non-standard
-  // textures
-  float vRepeat            = wallHeight / textureHeight;
-  float textureAspectRatio = textureWidth / textureHeight;
-
-  // Log detailed info for textures with unusual aspect ratios
-  if (textureAspectRatio > 2.5f || textureAspectRatio < 0.4f) {
-    OkLogger::warning("UV_DEBUG",
-                      "NON-STANDARD ASPECT RATIO - Texture: " + textureName +
-                          ", Dimensions: " + std::to_string(textureWidth) +
-                          "x" + std::to_string(textureHeight) +
-                          ", Aspect: " + std::to_string(textureAspectRatio) +
-                          ", Wall: " + std::to_string(wallLength) + "x" +
-                          std::to_string(wallHeight) +
-                          ", U repeat: " + std::to_string(uRepeat) +
-                          ", V repeat: " + std::to_string(vRepeat));
-  }
-
-  // Special logging for very wide textures that might appear blurry
-  if (textureAspectRatio > 4.0f) {
-    OkLogger::warning("UV_DEBUG",
-                      "VERY WIDE TEXTURE DETECTED - " + textureName + " (" +
-                          std::to_string(textureWidth) + "x" +
-                          std::to_string(textureHeight) + ")" +
-                          " - May appear blurry due to extreme aspect ratio: " +
-                          std::to_string(textureAspectRatio));
-  }
-
-  // Only log essential UV info to reduce clutter for standard textures
-  OkLogger::info("UV_DEBUG",
-                 "Texture: " + textureName +
-                     ", Length: " + std::to_string(wallLength) +
-                     ", U: " + std::to_string(uRepeat) +
-                     ", V: " + std::to_string(vRepeat) +
-                     ", Final UV: vBottom=" + std::to_string(vBottom) +
-                     ", vTop=" + std::to_string(vTop));
-
-  // Simple Y-axis flip: swap top and bottom V coordinates to correct texture
-  // orientation This flips the texture vertically without changing the UV range
-  // or scale
-  float vBottomFinal = vTop;
-  float vTopFinal    = vBottom;
-
-  // Add vertices with texture coordinates
   // Bottom left
   vertices.push_back(x1);
   vertices.push_back(wallBottom);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(vBottomFinal);
-
+  vertices.push_back(vBottom);
   // Top left
   vertices.push_back(x1);
   vertices.push_back(wallTop);
   vertices.push_back(-z1);
   vertices.push_back(u1);
-  vertices.push_back(vTopFinal);
-
+  vertices.push_back(vTop);
   // Bottom right
   vertices.push_back(x2);
   vertices.push_back(wallBottom);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(vBottomFinal);
-
+  vertices.push_back(vBottom);
   // Top right
   vertices.push_back(x2);
   vertices.push_back(wallTop);
   vertices.push_back(-z2);
   vertices.push_back(u2);
-  vertices.push_back(vTopFinal);
+  vertices.push_back(vTop);
 
-  // Log final wall vertex positions for debugging
-  OkLogger::info(
-      "WALL_DEBUG",
-      "Final wall vertices - Bottom Y: " + std::to_string(wallBottom) +
-          ", Top Y: " + std::to_string(wallTop) +
-          ", X range: " + std::to_string(x1) + " to " + std::to_string(x2) +
-          ", Z range: " + std::to_string(-z1) + " to " + std::to_string(-z2) +
-          ", UV: u1=" + std::to_string(u1) + ", u2=" + std::to_string(u2) +
-          ", vBottomFinal=" + std::to_string(vBottomFinal) +
-          ", vTopFinal=" + std::to_string(vTopFinal));
-
-  // Add indices (CCW winding)
-  unsigned int baseIndex = vertices.size() / 5 - 4;  // We just added 4 vertices
+  unsigned int baseIndex = static_cast<unsigned int>(vertices.size() / 5 - 4);
   indices.push_back(baseIndex);
   indices.push_back(baseIndex + 1);
   indices.push_back(baseIndex + 2);
@@ -371,130 +216,6 @@ WADGeometry::createLevelGeometry(const WAD::Level &level) {
   return sectorGroups;
 }
 
-/**
- * @brief Creates a vertical wall face between two sectors with different
- * heights.
- * @param vertex1 First vertex of the wall
- * @param vertex2 Second vertex of the wall
- * @param sector1 First sector
- * @param sector2 Second sector
- * @param sidedef Sidedef containing texture information
- * @param vertices Output vertex data
- * @param indices Output index data
- */
-void WADGeometry::createWallFace(const WAD::Vertex         &vertex1,
-                                 const WAD::Vertex         &vertex2,
-                                 const WAD::Sector         &sector1,
-                                 const WAD::Sector         &sector2,
-                                 const WAD::Sidedef        &sidedef,
-                                 std::vector<float>        &vertices,
-                                 std::vector<unsigned int> &indices) {
-  // Get level center coordinates from global config
-  float       levelCenterX = OkConfig::getFloat("level.center.x");
-  float       levelCenterY = OkConfig::getFloat("level.center.y");
-  const float SCALE        = 1.0f;
-
-  // Calculate normalized positions
-  float x1 = (static_cast<float>(vertex1.x) - levelCenterX) * SCALE;
-  float z1 = (static_cast<float>(vertex1.y) - levelCenterY) * SCALE;
-  float x2 = (static_cast<float>(vertex2.x) - levelCenterX) * SCALE;
-  float z2 = (static_cast<float>(vertex2.y) - levelCenterY) * SCALE;
-
-  // Get ceiling and floor heights, applying the same scale
-  float floor1 = static_cast<float>(sector1.floor_height) * SCALE;
-  float ceil1  = static_cast<float>(sector1.ceiling_height) * SCALE;
-  float floor2 = static_cast<float>(sector2.floor_height) * SCALE;
-  float ceil2  = static_cast<float>(sector2.ceiling_height) * SCALE;
-
-  // Calculate wall height and length for texture mapping
-  float wallBottom, wallTop;
-  float wallHeight;
-
-  if (sector1.ceiling_height > sector2.ceiling_height) {
-    // Upper wall section - from sector2's ceiling to sector1's ceiling
-    wallBottom = ceil2;  // Lower ceiling
-    wallTop    = ceil1;  // Higher ceiling
-    wallHeight = ceil1 - ceil2;
-  } else if (sector2.floor_height > sector1.floor_height) {
-    // Lower wall section - from lower floor to higher floor
-    wallBottom = floor1;  // Lower floor
-    wallTop    = floor2;  // Higher floor
-    wallHeight = floor2 - floor1;
-  } else {
-    // Middle wall section - use full height between sectors
-    wallBottom = std::max(floor1, floor2);
-    wallTop    = std::min(ceil1, ceil2);
-    wallHeight = wallTop - wallBottom;
-  }
-
-  float wallLength = sqrtf(powf(x2 - x1, 2.0f) + powf(z2 - z1, 2.0f));
-
-  // Texture coordinates handling
-  const float TEXTURE_WIDTH  = 64.0f;   // Standard DOOM texture width
-  const float TEXTURE_HEIGHT = 128.0f;  // Standard DOOM texture height
-
-  // Get texture offsets from sidedef
-  float uOffset = static_cast<float>(sidedef.x_offset);
-  float vOffset = static_cast<float>(sidedef.y_offset);
-
-  // Calculate vertex indices
-  unsigned int baseIndex =
-      static_cast<unsigned int>(vertices.size() / 5);  // 5 floats per vertex
-
-  // Calculate texture coordinates
-  // DOOM texture offsets are in texture pixels, normalize to 0-1 range
-  float u1 = uOffset / TEXTURE_WIDTH;
-  float u2 = u1 + (wallLength / TEXTURE_WIDTH);  // Texture repeats along length
-  // DOOM V coordinates: textures are anchored at bottom-left
-  // vOffset = 0 means texture starts at bottom of wall
-  // For OpenGL: v=0 is bottom, v=1 is top
-  float vBottom = vOffset / TEXTURE_HEIGHT;                 // Bottom of texture
-  float vTop    = vBottom + (wallHeight / TEXTURE_HEIGHT);  // Top of texture
-
-  // Debug UV mapping for textures
-
-  OkLogger::info("UV_DEBUG",
-                 "Adjusted UV mapping: vBottom=" + std::to_string(vBottom) +
-                     ", vTop=" + std::to_string(vTop));
-
-  // Add vertices for the wall quad with proper texture coordinates
-  // Bottom left
-  vertices.push_back(x1);
-  vertices.push_back(wallBottom);
-  vertices.push_back(-z1);
-  vertices.push_back(u1);
-  vertices.push_back(vBottom);
-
-  // Top left
-  vertices.push_back(x1);
-  vertices.push_back(wallTop);
-  vertices.push_back(-z1);
-  vertices.push_back(u1);
-  vertices.push_back(vTop);
-
-  // Bottom right
-  vertices.push_back(x2);
-  vertices.push_back(wallBottom);
-  vertices.push_back(-z2);
-  vertices.push_back(u2);
-  vertices.push_back(vBottom);
-
-  // Top right
-  vertices.push_back(x2);
-  vertices.push_back(wallTop);
-  vertices.push_back(-z2);
-  vertices.push_back(u2);
-  vertices.push_back(vTop);
-
-  // Add indices for two triangles (CCW winding)
-  indices.push_back(baseIndex);      // Bottom left
-  indices.push_back(baseIndex + 1);  // Top left
-  indices.push_back(baseIndex + 2);  // Bottom right
-
-  indices.push_back(baseIndex + 1);  // Top left
-  indices.push_back(baseIndex + 3);  // Top right
-  indices.push_back(baseIndex + 2);  // Bottom right
-}
 
 OkItemGroup *
 WADGeometry::createSectorGroup(const WAD::Level  &level,
@@ -664,7 +385,8 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
               GeometryGroup &group = geometryGroups[textureName];
               group.textureName    = textureName;
               createWallSection(v1, v2, sector2.ceiling_height,
-                                sector1.ceiling_height, rightSide,
+                                sector1.ceiling_height, textureName, 0,
+                                sector2.ceiling_height, linedef.flags, rightSide,
                                 group.vertices, group.indices);
             }
           }
@@ -677,8 +399,9 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
               GeometryGroup &group = geometryGroups[textureName];
               group.textureName    = textureName;
               createWallSection(v1, v2, sector1.floor_height,
-                                sector2.floor_height, rightSide, group.vertices,
-                                group.indices);
+                                sector2.floor_height, textureName, 1,
+                                sector2.ceiling_height, linedef.flags, rightSide,
+                                group.vertices, group.indices);
             }
           }
 
@@ -701,8 +424,9 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
               if (top > bottom) {
                 GeometryGroup &group = geometryGroups[middleTexName];
                 group.textureName    = middleTexName;
-                createWallSection(v1, v2, bottom, top, rightSide,
-                                  group.vertices, group.indices);
+                createWallSection(v1, v2, bottom, top, middleTexName, 2,
+                                  sector2.ceiling_height, linedef.flags,
+                                  rightSide, group.vertices, group.indices);
               }
             }
           }
@@ -710,131 +434,23 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
       }
       // One-sided linedef case
       else {
-        // For one-sided walls, we need to handle upper, middle, and lower
-        // textures Since there's no adjacent sector, we use the full sector
-        // height and split it based on texture availability and standard DOOM
-        // conventions
-
-        float wallFloor       = static_cast<float>(sector.floor_height);
-        float wallCeiling     = static_cast<float>(sector.ceiling_height);
-        float totalWallHeight = wallCeiling - wallFloor;
-
-        // Standard DOOM texture height for calculating splits
-        const float STANDARD_TEXTURE_HEIGHT = 128.0f;
-
-        // Check which textures are defined
-        std::string upperTexName =
-            OkStrings::trimFixedString(rightSide.upper_texture, 8);
-        std::string middleTexName =
+        // One-sided line: render the wall (middle) texture full height,
+        // floor to ceiling. Upper/lower on one-sided lines are unused in DOOM.
+        std::string oneSidedTex =
             OkStrings::trimFixedString(rightSide.middle_texture, 8);
-        std::string lowerTexName =
-            OkStrings::trimFixedString(rightSide.lower_texture, 8);
-
-        bool hasUpper  = !upperTexName.empty() && upperTexName != "-";
-        bool hasMiddle = !middleTexName.empty() && middleTexName != "-";
-        bool hasLower  = !lowerTexName.empty() && lowerTexName != "-";
-
-        // Calculate height splits based on which textures are present
-        if (hasUpper && hasMiddle && hasLower) {
-          // All three textures: split wall into three equal parts or use
-          // texture-based proportions
-          float upperHeight  = STANDARD_TEXTURE_HEIGHT;
-          float lowerHeight  = STANDARD_TEXTURE_HEIGHT;
-          float middleHeight = totalWallHeight - upperHeight - lowerHeight;
-
-          // Ensure middle section is not negative
-          if (middleHeight < 0.0f) {
-            // If wall is too short, scale proportionally
-            float scale = totalWallHeight /
-                          (upperHeight + lowerHeight + STANDARD_TEXTURE_HEIGHT);
-            upperHeight *= scale;
-            lowerHeight *= scale;
-            // middleHeight will be: totalWallHeight - upperHeight - lowerHeight
-          }
-
-          // Create upper wall section
-          GeometryGroup &upperGroup = geometryGroups[upperTexName];
-          upperGroup.textureName    = upperTexName;
-          createWallSection(v1, v2, wallCeiling - upperHeight, wallCeiling,
-                            rightSide, upperGroup.vertices, upperGroup.indices);
-
-          // Create middle wall section
-          GeometryGroup &middleGroup = geometryGroups[middleTexName];
-          middleGroup.textureName    = middleTexName;
-          createWallSection(v1, v2, wallFloor + lowerHeight,
-                            wallCeiling - upperHeight, rightSide,
-                            middleGroup.vertices, middleGroup.indices);
-
-          // Create lower wall section
-          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
-          lowerGroup.textureName    = lowerTexName;
-          createWallSection(v1, v2, wallFloor, wallFloor + lowerHeight,
-                            rightSide, lowerGroup.vertices, lowerGroup.indices);
-        } else if (hasUpper && hasMiddle) {
-          // Upper and middle: upper takes standard height, middle takes the
-          // rest
-          float upperHeight =
-              std::min(STANDARD_TEXTURE_HEIGHT, totalWallHeight * 0.5f);
-
-          GeometryGroup &upperGroup = geometryGroups[upperTexName];
-          upperGroup.textureName    = upperTexName;
-          createWallSection(v1, v2, wallCeiling - upperHeight, wallCeiling,
-                            rightSide, upperGroup.vertices, upperGroup.indices);
-
-          GeometryGroup &middleGroup = geometryGroups[middleTexName];
-          middleGroup.textureName    = middleTexName;
-          createWallSection(v1, v2, wallFloor, wallCeiling - upperHeight,
-                            rightSide, middleGroup.vertices,
-                            middleGroup.indices);
-        } else if (hasMiddle && hasLower) {
-          // Middle and lower: lower takes standard height, middle takes the
-          // rest
-          float lowerHeight =
-              std::min(STANDARD_TEXTURE_HEIGHT, totalWallHeight * 0.5f);
-
-          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
-          lowerGroup.textureName    = lowerTexName;
-          createWallSection(v1, v2, wallFloor, wallFloor + lowerHeight,
-                            rightSide, lowerGroup.vertices, lowerGroup.indices);
-
-          GeometryGroup &middleGroup = geometryGroups[middleTexName];
-          middleGroup.textureName    = middleTexName;
-          createWallSection(v1, v2, wallFloor + lowerHeight, wallCeiling,
-                            rightSide, middleGroup.vertices,
-                            middleGroup.indices);
-        } else if (hasUpper && hasLower) {
-          // Upper and lower only: split wall in half
-          float halfHeight = totalWallHeight * 0.5f;
-
-          GeometryGroup &upperGroup = geometryGroups[upperTexName];
-          upperGroup.textureName    = upperTexName;
-          createWallSection(v1, v2, wallFloor + halfHeight, wallCeiling,
-                            rightSide, upperGroup.vertices, upperGroup.indices);
-
-          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
-          lowerGroup.textureName    = lowerTexName;
-          createWallSection(v1, v2, wallFloor, wallFloor + halfHeight,
-                            rightSide, lowerGroup.vertices, lowerGroup.indices);
-        } else if (hasUpper) {
-          // Upper texture only: use full wall height
-          GeometryGroup &upperGroup = geometryGroups[upperTexName];
-          upperGroup.textureName    = upperTexName;
-          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
-                            upperGroup.vertices, upperGroup.indices);
-        } else if (hasLower) {
-          // Lower texture only: use full wall height
-          GeometryGroup &lowerGroup = geometryGroups[lowerTexName];
-          lowerGroup.textureName    = lowerTexName;
-          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
-                            lowerGroup.vertices, lowerGroup.indices);
-        } else if (hasMiddle) {
-          // Middle texture only: use full wall height (original behavior)
-          GeometryGroup &middleGroup = geometryGroups[middleTexName];
-          middleGroup.textureName    = middleTexName;
-          createWallSection(v1, v2, wallFloor, wallCeiling, rightSide,
-                            middleGroup.vertices, middleGroup.indices);
+        if (oneSidedTex.empty() || oneSidedTex == "-") {
+          oneSidedTex = OkStrings::trimFixedString(rightSide.lower_texture, 8);
         }
-        // If no textures are defined, create no wall sections
+        if (oneSidedTex.empty() || oneSidedTex == "-") {
+          oneSidedTex = OkStrings::trimFixedString(rightSide.upper_texture, 8);
+        }
+        if (!oneSidedTex.empty() && oneSidedTex != "-") {
+          GeometryGroup &group = geometryGroups[oneSidedTex];
+          group.textureName    = oneSidedTex;
+          createWallSection(v1, v2, sector.floor_height, sector.ceiling_height,
+                            oneSidedTex, 2, sector.ceiling_height, linedef.flags,
+                            rightSide, group.vertices, group.indices);
+        }
       }
     }
 
@@ -854,10 +470,14 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
           if (!textureName.empty() && textureName != "-") {
             GeometryGroup &group = geometryGroups[textureName];
             group.textureName    = textureName;
-            // Note: reverse vertex order for left side
-            createWallSection(v2, v1, sector1.ceiling_height,
-                              sector2.ceiling_height, leftSide, group.vertices,
-                              group.indices);
+            // Keep the linedef's intrinsic v1->v2 order (same as the right
+            // side) so the texture U runs in the same direction on both sides;
+            // otherwise adjacent faces of e.g. a column come out mirrored. The
+            // engine does no backface culling, so winding does not matter here.
+            createWallSection(v1, v2, sector1.ceiling_height,
+                              sector2.ceiling_height, textureName, 0,
+                              sector1.ceiling_height, linedef.flags, leftSide,
+                              group.vertices, group.indices);
           }
         }
 
@@ -868,10 +488,11 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
           if (!textureName.empty() && textureName != "-") {
             GeometryGroup &group = geometryGroups[textureName];
             group.textureName    = textureName;
-            // Note: reverse vertex order for left side
-            createWallSection(v2, v1, sector2.floor_height,
-                              sector1.floor_height, leftSide, group.vertices,
-                              group.indices);
+            // v1->v2 order (see upper-section note): consistent U on both sides.
+            createWallSection(v1, v2, sector2.floor_height,
+                              sector1.floor_height, textureName, 1,
+                              sector1.ceiling_height, linedef.flags, leftSide,
+                              group.vertices, group.indices);
           }
         }
 
@@ -885,9 +506,10 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
           if (top > bottom) {
             GeometryGroup &group = geometryGroups[middleTexName];
             group.textureName    = middleTexName;
-            // Note: reverse vertex order for left side
-            createWallSection(v2, v1, bottom, top, leftSide, group.vertices,
-                              group.indices);
+            // v1->v2 order (see upper-section note): consistent U on both sides.
+            createWallSection(v1, v2, bottom, top, middleTexName, 2,
+                              sector1.ceiling_height, linedef.flags, leftSide,
+                              group.vertices, group.indices);
           }
         }
       }
