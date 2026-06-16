@@ -341,13 +341,14 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
 
     // clang-format off
-    if (argc < 2 || argc > 6) {
-      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose] [--mcp]\n";
+    if (argc < 2 || argc > 7) {
+      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose] [--mcp] [--no-input]\n";
       std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
       std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
       std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
       std::cout << "  --verbose   : Optional. Enable verbose debug output\n";
       std::cout << "  --mcp       : Optional. Start the MCP server (http://127.0.0.1:8765/mcp) for agent control\n";
+      std::cout << "  --no-input  : Optional. Ignore physical mouse/keyboard input (control only via the MCP)\n";
       return 1;
     }
     // clang-format on
@@ -357,6 +358,7 @@ int main(int argc, char *argv[]) {
     std::string levelName = "";     // Empty string means use first level
     bool        verbose    = false;  // Default: not verbose
     bool        mcpEnabled  = false;  // Enable the in-engine MCP server
+    bool        noInput     = false;  // Ignore physical input (MCP-only)
 
     // Scan all arguments for optional flags.
     for (int i = 1; i < argc; i++) {
@@ -365,6 +367,8 @@ int main(int argc, char *argv[]) {
         verbose = true;
       } else if (arg == "--mcp") {
         mcpEnabled = true;
+      } else if (arg == "--no-input") {
+        noInput = true;
       }
     }
 
@@ -536,6 +540,12 @@ int main(int argc, char *argv[]) {
     // connect over local HTTP and observe/drive the app while it runs.
     if (mcpEnabled) {
       OkCore::enableMcpServer();
+    }
+
+    // Ignore the user's physical input (mouse/keyboard) if requested, so an
+    // MCP-driven instance can only be controlled through the MCP server.
+    if (noInput) {
+      OkCore::setIgnoreUserInput(true);
     }
 
     // Verify engine is properly initialized before starting the loop

@@ -127,8 +127,10 @@ rendering. Launch the viewer with `--mcp`:
 xmake run wadviewer wads/doom1.wad E1M1 --mcp
 ```
 
-It logs `MCP server listening on http://127.0.0.1:8765/mcp`. Then register
-it in Claude Code:
+It logs `MCP server listening on http://127.0.0.1:8765/mcp`. Add
+`--no-input` to ignore your physical mouse/keyboard so the instance is
+driven only through the MCP (the window stays visible to watch). Then
+register it in Claude Code:
 
 ```bash
 claude mcp add --transport http okinawa http://127.0.0.1:8765/mcp
