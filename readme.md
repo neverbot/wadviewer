@@ -95,6 +95,10 @@ xmake run wadviewer wads/doom1.wad E1M1
 ║  TEXTURE VIEWER:                                             ║
 ║    SPACE BAR  - Cycle through textures                       ║
 ║    T          - Toggle texture viewer visibility             ║
+║                                                              ║
+║  DEBUG / INSPECT:                                           ║
+║    F          - Toggle debug gizmos (origin axes, camera     ║
+║                 boxes, wireframe cubes)                      ║
 ║    R          - Toggle ceiling/floor visibility              ║
 ║                                                              ║
 ║  CAMERAS:                                                    ║
