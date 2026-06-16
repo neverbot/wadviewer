@@ -17,6 +17,18 @@
 #include <string>
 #include <vector>
 
+namespace {
+// DOOM's sky hack: two adjacent sectors that BOTH have an F_SKY1 (sky) ceiling
+// never show an upper wall between them, even when their ceiling heights differ
+// (r_segs.c: "hack to allow height changes in outdoor areas" -> worldtop is
+// pulled down to worldhigh, so no upper texture is drawn). Without this we draw
+// a tall false wall around open-air areas -- e.g. the low perimeter of E1M1's
+// nukage courtyard, which should be open to the sky.
+bool ceilingIsSky(const WAD::Sector &sector) {
+  return OkStrings::trimFixedString(sector.ceiling_texture, 8) == "F_SKY1";
+}
+}  // namespace
+
 void WADGeometry::createWallSection(const WAD::Vertex &vertex1,
                                     const WAD::Vertex &vertex2, float wallBottom,
                                     float wallTop, const std::string &textureName,
@@ -380,7 +392,8 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
           // Upper wall: DOOM draws this side's upper texture when THIS sector's
           // ceiling is higher than the neighbour's; it fills the gap from the
           // neighbour ceiling up to this ceiling.
-          if (sector2.ceiling_height > sector1.ceiling_height) {
+          if (sector2.ceiling_height > sector1.ceiling_height &&
+              !(ceilingIsSky(sector1) && ceilingIsSky(sector2))) {
             std::string textureName =
                 OkStrings::trimFixedString(rightSide.upper_texture, 8);
             if (!textureName.empty() && textureName != "-") {
@@ -473,7 +486,8 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
         // the texture U runs in the same direction on both sides; otherwise
         // adjacent faces of e.g. a column come out mirrored. The engine does no
         // backface culling, so winding does not matter here.
-        if (sector1.ceiling_height > sector2.ceiling_height) {
+        if (sector1.ceiling_height > sector2.ceiling_height &&
+            !(ceilingIsSky(sector1) && ceilingIsSky(sector2))) {
           std::string textureName =
               OkStrings::trimFixedString(leftSide.upper_texture, 8);
           if (!textureName.empty() && textureName != "-") {
