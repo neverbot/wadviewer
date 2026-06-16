@@ -493,8 +493,18 @@ void WADGenerate::createSectorGeometry(const WAD::Level  &level,
   std::vector<int>  container(loops.size(), -1);
   for (size_t a = 0; a < loops.size(); a++) {
     double areaA = std::fabs(loopSignedArea2(level, loops[a]));
-    double px    = static_cast<double>(level.vertices[loops[a][0]].x);
-    double py    = static_cast<double>(level.vertices[loops[a][0]].y);
+    // Use the loop centroid (not a boundary vertex) as the containment probe:
+    // a boundary vertex is frequently shared with the containing loop, where
+    // point-in-polygon is ambiguous. The centroid sits well inside the loop's
+    // region, which is itself inside the container, so the test is reliable.
+    double px = 0.0;
+    double py = 0.0;
+    for (size_t k = 0; k < loops[a].size(); k++) {
+      px += static_cast<double>(level.vertices[loops[a][k]].x);
+      py += static_cast<double>(level.vertices[loops[a][k]].y);
+    }
+    px /= static_cast<double>(loops[a].size());
+    py /= static_cast<double>(loops[a].size());
     double smallest = std::numeric_limits<double>::max();
     for (size_t b = 0; b < loops.size(); b++) {
       if (a == b) {
