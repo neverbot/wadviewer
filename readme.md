@@ -85,6 +85,11 @@ xmake run wadviewer wads/doom1.wad E1M1
 - `-dsl`: Use DSL format
 - `content_file`: Path to the input file
 - `level_name`: Optional. Name of the level to display. If not specified, the first level in the file will be used.
+- `--mcp`: Optional. Start the in-engine MCP server (only effective if the
+  server was compiled in — see "Compiling the MCP server in or out").
+- `--no-input`: Optional. Ignore physical mouse/keyboard so the instance is
+  driven only through the MCP. The window stays visible.
+- `--verbose`: Optional. Enable verbose debug logging.
 
 ### Controls
 
@@ -150,8 +155,22 @@ Tools exposed by the server:
 - `set_camera_pose` — teleport/orient the active camera directly.
 - `get_state` — camera pose, fps, scene counts, window size, memory.
 
-The server is compiled in by default (debug builds); exclude it with
-`xmake f --mcp=n`.
+### Compiling the MCP server in or out
+
+Whether the MCP server is *compiled into* the binary is a build-time choice
+with a **mode-dependent default**: it is **included in debug builds and
+excluded from release builds** (release defines `NDEBUG`, which the engine's
+`mcp-config.hpp` uses to decide). Override the default with at most one of:
+
+```bash
+xmake f --mcp=y      # force the MCP server IN  (e.g. to use it in a release build)
+xmake f --no-mcp=y   # force the MCP server OUT (e.g. a lean debug build)
+```
+
+When excluded, the server code is an empty translation unit — no MCP/HTTP code
+or its dependencies land in the binary, and the runtime `--mcp` flag logs a
+warning and does nothing. (This is the okinawa engine's `mcp` build option; see
+its readme.)
 
 ## Dependencies
 
