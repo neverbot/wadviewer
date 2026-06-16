@@ -332,8 +332,34 @@ std::vector<std::vector<int> > buildSectorLoops(const WAD::Level &level,
     }
   }
 
+  // Cancel exact reverse-pairs before chaining. A self-referencing linedef
+  // (both sidedefs point at THIS sector -- the Boom deep-water / fake-bridge
+  // control trick) contributes both a->b and b->a, so the two directed edges
+  // are an exact reverse-pair. They carry no real boundary: a pure control
+  // sector is made entirely of such pairs and must yield zero edges (skipped
+  // harmlessly, no degenerate sliver loop), while a sector that mixes a few
+  // self-ref linedefs with real walls keeps its genuine boundary intact.
+  // (Blanket-excluding self-ref linedefs is wrong -- it also drops the real
+  // edges of mixed sectors and leaves more loops unclosed.)
+  std::vector<bool> cancelled(edgeA.size(), false);
+  for (size_t i = 0; i < edgeA.size(); i++) {
+    if (cancelled[i]) {
+      continue;
+    }
+    for (size_t k = i + 1; k < edgeA.size(); k++) {
+      if (!cancelled[k] && edgeA[k] == edgeB[i] && edgeB[k] == edgeA[i]) {
+        cancelled[i] = true;
+        cancelled[k] = true;
+        break;
+      }
+    }
+  }
+
   // Chain edges end-to-start into closed loops.
   std::vector<bool> used(edgeA.size(), false);
+  for (size_t i = 0; i < edgeA.size(); i++) {
+    used[i] = cancelled[i];
+  }
   for (size_t i = 0; i < edgeA.size(); i++) {
     if (used[i]) {
       continue;
