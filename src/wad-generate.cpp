@@ -413,6 +413,14 @@ std::vector<int>
 bridgeHoleIntoOuter(const WAD::Level &level, const std::vector<int> &outer,
                     const std::vector<int>               &hole,
                     const std::vector<std::vector<int> > &obstacles) {
+  // Pick the SHORTEST valid bridge rather than the first found. Taking the
+  // first tends to route every hole to the same outer vertex (it is visible to
+  // all of them), piling several bridge spikes onto one point and producing a
+  // degenerate ring ear-clipping cannot finish. The nearest valid vertex
+  // naturally spreads bridges to distinct nearby points (as earcut does).
+  size_t bestH    = 0;
+  size_t bestO    = 0;
+  double bestDist = -1.0;
   for (size_t h = 0; h < hole.size(); h++) {
     for (size_t o = 0; o < outer.size(); o++) {
       if (bridgeBlocked(level, outer[o], hole[h], obstacles)) {
@@ -420,33 +428,44 @@ bridgeHoleIntoOuter(const WAD::Level &level, const std::vector<int> &outer,
       }
       // Crossing no edge is not enough: a segment can run OUTSIDE the outer
       // boundary (through a concavity) or across the hole without crossing an
-      // edge, which makes the spliced ring self-intersect and ear-clipping
-      // leave large gaps. Require the bridge midpoint to lie inside the outer
-      // loop and outside the hole, so the bridge is genuinely interior.
-      double mx = 0.5 * (static_cast<double>(level.vertices[outer[o]].x) +
-                         static_cast<double>(level.vertices[hole[h]].x));
-      double my = 0.5 * (static_cast<double>(level.vertices[outer[o]].y) +
-                         static_cast<double>(level.vertices[hole[h]].y));
+      // edge, which makes the spliced ring self-intersect. Require the bridge
+      // midpoint to lie inside the outer loop and outside the hole.
+      double ox = static_cast<double>(level.vertices[outer[o]].x);
+      double oy = static_cast<double>(level.vertices[outer[o]].y);
+      double hx = static_cast<double>(level.vertices[hole[h]].x);
+      double hy = static_cast<double>(level.vertices[hole[h]].y);
+      double mx = 0.5 * (ox + hx);
+      double my = 0.5 * (oy + hy);
       if (!pointInLoop(level, mx, my, outer) ||
           pointInLoop(level, mx, my, hole)) {
         continue;
       }
-      std::vector<int> result;
-      for (size_t k = 0; k <= o; k++) {
-        result.push_back(outer[k]);
+      double dist = (ox - hx) * (ox - hx) + (oy - hy) * (oy - hy);
+      if (bestDist < 0.0 || dist < bestDist) {
+        bestDist = dist;
+        bestH    = h;
+        bestO    = o;
       }
-      for (size_t k = 0; k <= hole.size(); k++) {
-        result.push_back(hole[(h + k) % hole.size()]);
-      }
-      result.push_back(outer[o]);
-      for (size_t k = o + 1; k < outer.size(); k++) {
-        result.push_back(outer[k]);
-      }
-      return result;
     }
   }
+
   // No valid bridge found: leave the hole uncut rather than corrupt the ring.
-  return outer;
+  if (bestDist < 0.0) {
+    return outer;
+  }
+
+  std::vector<int> result;
+  for (size_t k = 0; k <= bestO; k++) {
+    result.push_back(outer[k]);
+  }
+  for (size_t k = 0; k <= hole.size(); k++) {
+    result.push_back(hole[(bestH + k) % hole.size()]);
+  }
+  result.push_back(outer[bestO]);
+  for (size_t k = bestO + 1; k < outer.size(); k++) {
+    result.push_back(outer[k]);
+  }
+  return result;
 }
 
 // Ear-clipping triangulation of a simple polygon (ring of WAD vertex indices,
@@ -598,19 +617,26 @@ void WADGenerate::createSectorGeometry(const WAD::Level  &level,
       continue;
     }
 
-    // Bridge every contained hole into the outer ring (one simple polygon).
-    std::vector<std::vector<int> > obstacles;
-    obstacles.push_back(loops[a]);
+    // Collect this outer loop's holes, then bridge them in one at a time. Each
+    // bridge is validated against the CURRENT ring (which already contains the
+    // previous bridges) plus the holes still pending, so a sector with several
+    // holes (e.g. a room full of computer consoles) cannot produce crossing
+    // bridges that stall the triangulation and leave gaps.
+    std::vector<std::vector<int> > pending;
     for (size_t b = 0; b < loops.size(); b++) {
       if (isHole[b] && container[b] == static_cast<int>(a)) {
-        obstacles.push_back(loops[b]);
+        pending.push_back(loops[b]);
       }
     }
     std::vector<int> ring = loops[a];
-    for (size_t b = 0; b < loops.size(); b++) {
-      if (isHole[b] && container[b] == static_cast<int>(a)) {
-        ring = bridgeHoleIntoOuter(level, ring, loops[b], obstacles);
+    while (!pending.empty()) {
+      std::vector<std::vector<int> > obstacles;
+      obstacles.push_back(ring);
+      for (size_t k = 0; k < pending.size(); k++) {
+        obstacles.push_back(pending[k]);
       }
+      ring = bridgeHoleIntoOuter(level, ring, pending[0], obstacles);
+      pending.erase(pending.begin());
     }
 
     // Emit GL vertices for this ring; indices below are relative to base.
