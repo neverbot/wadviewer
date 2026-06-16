@@ -82,6 +82,31 @@ void stepCallback(float deltaTime) {
   }
   lastAction1State = state.action3;
 
+  // Toggle all debug gizmos (origin axes + the wireframe debug cubes) with F.
+  // The texture-preview square has its own toggle (T) handled by the GUI.
+  if (state.action4) {
+    bool debugVisible = !OkConfig::getBool("viewer.debug-gizmos-visible");
+    OkConfig::setBool("viewer.debug-gizmos-visible", debugVisible);
+
+    // Green wireframe boxes for the inactive cameras (engine-drawn gizmo).
+    OkConfig::setBool("graphics.drawCameras", debugVisible);
+
+    for (size_t i = 0; i < sectorGroups.size(); i++) {
+      sectorGroups[i]->setDrawOriginAxis(debugVisible);
+    }
+    if (item) {
+      item->setVisible(debugVisible);
+      item->setDrawOriginAxis(debugVisible);
+    }
+    if (item2) {
+      item2->setVisible(debugVisible);
+      item2->setDrawOriginAxis(debugVisible);
+    }
+
+    OkLogger::info("UI", "Debug gizmos toggled: " +
+                             std::string(debugVisible ? "ON" : "OFF"));
+  }
+
   OkPoint forward = camera->getRotation().getForwardVector();
   OkPoint right   = camera->getRotation().getRightVector();
   OkPoint direction(0.0f, 0.0f, 0.0f);
@@ -448,6 +473,10 @@ int main(int argc, char *argv[]) {
         group->setDrawOriginAxisForAll(false);
         group->setDrawOriginAxis(true);
       }
+
+      // Debug gizmos (origin axes + wireframe cubes) start visible; the F key
+      // toggles them all off/on (see stepCallback).
+      OkConfig::setBool("viewer.debug-gizmos-visible", true);
 
       // Position camera to view the entire level
       positionCameraForLevel(camera, sectorGroups);
