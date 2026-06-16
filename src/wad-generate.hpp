@@ -70,17 +70,18 @@ public:
 
 private:
   /**
-   * @brief Create geometry data for a sector (floor or ceiling).
+   * @brief Create geometry data for a sector (floor or ceiling) by building the
+   *        sector's ordered boundary loops from its linedefs and triangulating
+   *        them (ear-clipping, with inner holes such as pillars cut out).
    * @param level The WAD level data
    * @param sector The sector to generate geometry for
-   * @param sectorVertices Vector of vertex indices for this sector
+   * @param sectorIndex The index of the sector in the level
    * @param isFloor True for floor, false for ceiling
    * @param vertices Output vertex data
    * @param indices Output index data
    */
-  static void createSectorGeometry(const WAD::Level       &level,
-                                   const WAD::Sector      &sector,
-                                   const std::vector<int> &sectorVertices,
+  static void createSectorGeometry(const WAD::Level  &level,
+                                   const WAD::Sector &sector, int sectorIndex,
                                    bool isFloor, std::vector<float> &vertices,
                                    std::vector<unsigned int> &indices);
 

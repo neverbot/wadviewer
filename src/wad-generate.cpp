@@ -84,7 +84,7 @@ OkItem *WADGenerate::generateSectorFloor(const WAD::Level       &level,
   std::vector<unsigned int> indices;
 
   // Create geometry for this floor
-  createSectorGeometry(level, sector, sectorVertices, true, vertices, indices);
+  createSectorGeometry(level, sector, sectorIndex, true, vertices, indices);
 
   if (vertices.empty() || indices.empty()) {
     return nullptr;
@@ -161,7 +161,7 @@ OkItem *WADGenerate::generateSectorCeiling(
   std::vector<unsigned int> indices;
 
   // Create geometry for this ceiling
-  createSectorGeometry(level, sector, sectorVertices, false, vertices, indices);
+  createSectorGeometry(level, sector, sectorIndex, false, vertices, indices);
 
   if (vertices.empty() || indices.empty()) {
     return nullptr;
@@ -219,62 +219,355 @@ OkItem *WADGenerate::generateSectorCeiling(
   return item;
 }
 
-void WADGenerate::createSectorGeometry(const WAD::Level       &level,
-                                       const WAD::Sector      &sector,
-                                       const std::vector<int> &sectorVertices,
-                                       bool                    isFloor,
-                                       std::vector<float>     &vertices,
-                                       std::vector<unsigned int> &indices) {
+namespace {
 
-  if (sectorVertices.size() < 3) {
-    return;  // Need at least 3 vertices to form a polygon
+// 2x the signed area of a loop given as WAD vertex indices (DOOM x,y plane).
+// Positive when the loop winds counter-clockwise.
+double loopSignedArea2(const WAD::Level       &level,
+                       const std::vector<int> &loop) {
+  double sum = 0.0;
+  size_t n   = loop.size();
+  for (size_t i = 0; i < n; i++) {
+    const WAD::Vertex &p = level.vertices[loop[i]];
+    const WAD::Vertex &q = level.vertices[loop[(i + 1) % n]];
+    sum += static_cast<double>(p.x) * static_cast<double>(q.y) -
+           static_cast<double>(q.x) * static_cast<double>(p.y);
+  }
+  return sum;
+}
+
+// Ray-casting point-in-polygon test (polygon given as WAD vertex indices).
+bool pointInLoop(const WAD::Level &level, double px, double py,
+                 const std::vector<int> &loop) {
+  bool   inside = false;
+  size_t n      = loop.size();
+  size_t j      = n - 1;
+  for (size_t i = 0; i < n; i++) {
+    double ax = static_cast<double>(level.vertices[loop[i]].x);
+    double ay = static_cast<double>(level.vertices[loop[i]].y);
+    double bx = static_cast<double>(level.vertices[loop[j]].x);
+    double by = static_cast<double>(level.vertices[loop[j]].y);
+    if (((ay > py) != (by > py)) &&
+        (px < (bx - ax) * (py - ay) / (by - ay) + ax)) {
+      inside = !inside;
+    }
+    j = i;
+  }
+  return inside;
+}
+
+// Build the ordered boundary loops of a sector by chaining its linedef edges.
+// A linedef whose front (right) sidedef is the sector contributes the edge
+// start->end; whose back (left) sidedef is the sector contributes end->start.
+// This keeps the sector interior consistently on one side, so the chained
+// edges close into loops: the outer boundary plus any inner holes (pillars).
+std::vector<std::vector<int> > buildSectorLoops(const WAD::Level &level,
+                                                int               sectorIndex) {
+  std::vector<std::vector<int> > loops;
+
+  // Collect the sector's directed boundary edges (a -> b as vertex indices).
+  std::vector<int> edgeA;
+  std::vector<int> edgeB;
+  for (size_t i = 0; i < level.linedefs.size(); i++) {
+    const WAD::Linedef &linedef = level.linedefs[i];
+    if (linedef.start_vertex >= level.vertices.size() ||
+        linedef.end_vertex >= level.vertices.size()) {
+      continue;
+    }
+    if (linedef.right_sidedef != 0xFFFF &&
+        linedef.right_sidedef < level.sidedefs.size() &&
+        level.sidedefs[linedef.right_sidedef].sector == sectorIndex) {
+      edgeA.push_back(static_cast<int>(linedef.start_vertex));
+      edgeB.push_back(static_cast<int>(linedef.end_vertex));
+    }
+    if (linedef.left_sidedef != 0xFFFF &&
+        linedef.left_sidedef < level.sidedefs.size() &&
+        level.sidedefs[linedef.left_sidedef].sector == sectorIndex) {
+      edgeA.push_back(static_cast<int>(linedef.end_vertex));
+      edgeB.push_back(static_cast<int>(linedef.start_vertex));
+    }
   }
 
-  // Get level center coordinates from global config
+  // Chain edges end-to-start into closed loops.
+  std::vector<bool> used(edgeA.size(), false);
+  for (size_t i = 0; i < edgeA.size(); i++) {
+    if (used[i]) {
+      continue;
+    }
+    std::vector<int> loop;
+    int              loopStart = edgeA[i];
+    int              cur       = static_cast<int>(i);
+    bool             closed    = false;
+    while (cur != -1 && !used[cur]) {
+      used[cur] = true;
+      loop.push_back(edgeA[cur]);
+      int endVertex = edgeB[cur];
+      if (endVertex == loopStart) {
+        closed = true;
+        break;
+      }
+      int next = -1;
+      for (size_t k = 0; k < edgeA.size(); k++) {
+        if (!used[k] && edgeA[k] == endVertex) {
+          next = static_cast<int>(k);
+          break;
+        }
+      }
+      cur = next;
+    }
+    if (closed && loop.size() >= 3) {
+      loops.push_back(loop);
+    }
+  }
+  return loops;
+}
+
+// Whether two segments (p0-p1) and (q0-q1) properly cross, ignoring pairs that
+// merely share an endpoint. Used to validate hole bridges.
+bool segmentsCross(double p0x, double p0y, double p1x, double p1y, double q0x,
+                   double q0y, double q1x, double q1y) {
+  if ((p0x == q0x && p0y == q0y) || (p0x == q1x && p0y == q1y) ||
+      (p1x == q0x && p1y == q0y) || (p1x == q1x && p1y == q1y)) {
+    return false;
+  }
+  double d1 = (q1x - q0x) * (p0y - q0y) - (q1y - q0y) * (p0x - q0x);
+  double d2 = (q1x - q0x) * (p1y - q0y) - (q1y - q0y) * (p1x - q0x);
+  double d3 = (p1x - p0x) * (q0y - p0y) - (p1y - p0y) * (q0x - p0x);
+  double d4 = (p1x - p0x) * (q1y - p0y) - (p1y - p0y) * (q1x - p0x);
+  return ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0));
+}
+
+// Whether a candidate bridge (va-vb) crosses any edge of the given loops.
+bool bridgeBlocked(const WAD::Level &level, int va, int vb,
+                   const std::vector<std::vector<int> > &loops) {
+  double ax = static_cast<double>(level.vertices[va].x);
+  double ay = static_cast<double>(level.vertices[va].y);
+  double bx = static_cast<double>(level.vertices[vb].x);
+  double by = static_cast<double>(level.vertices[vb].y);
+  for (size_t l = 0; l < loops.size(); l++) {
+    const std::vector<int> &loop = loops[l];
+    size_t                  n    = loop.size();
+    for (size_t i = 0; i < n; i++) {
+      double e0x = static_cast<double>(level.vertices[loop[i]].x);
+      double e0y = static_cast<double>(level.vertices[loop[i]].y);
+      double e1x = static_cast<double>(level.vertices[loop[(i + 1) % n]].x);
+      double e1y = static_cast<double>(level.vertices[loop[(i + 1) % n]].y);
+      if (segmentsCross(ax, ay, bx, by, e0x, e0y, e1x, e1y)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Splice a hole loop into an outer ring through a bridge edge, producing a
+// single ring (with coincident bridge edges) an ear-clipper can consume.
+std::vector<int>
+bridgeHoleIntoOuter(const WAD::Level &level, const std::vector<int> &outer,
+                    const std::vector<int>               &hole,
+                    const std::vector<std::vector<int> > &obstacles) {
+  for (size_t h = 0; h < hole.size(); h++) {
+    for (size_t o = 0; o < outer.size(); o++) {
+      if (bridgeBlocked(level, outer[o], hole[h], obstacles)) {
+        continue;
+      }
+      std::vector<int> result;
+      for (size_t k = 0; k <= o; k++) {
+        result.push_back(outer[k]);
+      }
+      for (size_t k = 0; k <= hole.size(); k++) {
+        result.push_back(hole[(h + k) % hole.size()]);
+      }
+      result.push_back(outer[o]);
+      for (size_t k = o + 1; k < outer.size(); k++) {
+        result.push_back(outer[k]);
+      }
+      return result;
+    }
+  }
+  // No valid bridge found: leave the hole uncut rather than corrupt the ring.
+  return outer;
+}
+
+// Ear-clipping triangulation of a simple polygon (ring of WAD vertex indices,
+// possibly with bridge duplicates). Emits triangles as triples of POSITIONS
+// into the ring.
+void earClip(const WAD::Level &level, const std::vector<int> &ring,
+             std::vector<unsigned int> &outTriangles) {
+  int n = static_cast<int>(ring.size());
+  if (n < 3) {
+    return;
+  }
+
+  // Work on a list of ring positions ordered counter-clockwise.
+  std::vector<int> poly(n);
+  if (loopSignedArea2(level, ring) >= 0.0) {
+    for (int i = 0; i < n; i++) {
+      poly[i] = i;
+    }
+  } else {
+    for (int i = 0; i < n; i++) {
+      poly[i] = n - 1 - i;
+    }
+  }
+
+  int guard = 4 * n;
+  while (static_cast<int>(poly.size()) > 2 && guard-- > 0) {
+    int  m        = static_cast<int>(poly.size());
+    bool earFound = false;
+    for (int i = 0; i < m; i++) {
+      int    pa = poly[(i + m - 1) % m];
+      int    pb = poly[i];
+      int    pc = poly[(i + 1) % m];
+      double ax = static_cast<double>(level.vertices[ring[pa]].x);
+      double ay = static_cast<double>(level.vertices[ring[pa]].y);
+      double bx = static_cast<double>(level.vertices[ring[pb]].x);
+      double by = static_cast<double>(level.vertices[ring[pb]].y);
+      double cx = static_cast<double>(level.vertices[ring[pc]].x);
+      double cy = static_cast<double>(level.vertices[ring[pc]].y);
+
+      // Convex vertex? (left turn for a CCW polygon.)
+      double cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+      if (cross <= 0.0) {
+        continue;  // reflex or degenerate
+      }
+
+      // Reject the ear if any other vertex falls inside the candidate triangle.
+      bool contains = false;
+      for (int k = 0; k < m; k++) {
+        int pk = poly[k];
+        if (pk == pa || pk == pb || pk == pc) {
+          continue;
+        }
+        double px = static_cast<double>(level.vertices[ring[pk]].x);
+        double py = static_cast<double>(level.vertices[ring[pk]].y);
+        double d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+        double d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+        double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+        bool   hasNeg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
+        bool   hasPos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+        if (!(hasNeg && hasPos)) {
+          contains = true;
+          break;
+        }
+      }
+      if (contains) {
+        continue;
+      }
+
+      outTriangles.push_back(static_cast<unsigned int>(pa));
+      outTriangles.push_back(static_cast<unsigned int>(pb));
+      outTriangles.push_back(static_cast<unsigned int>(pc));
+      poly.erase(poly.begin() + i);
+      guard    = 4 * static_cast<int>(poly.size());
+      earFound = true;
+      break;
+    }
+    if (!earFound) {
+      break;  // Cannot make further progress (degenerate geometry).
+    }
+  }
+}
+
+}  // namespace
+
+void WADGenerate::createSectorGeometry(const WAD::Level  &level,
+                                       const WAD::Sector &sector,
+                                       int sectorIndex, bool isFloor,
+                                       std::vector<float>        &vertices,
+                                       std::vector<unsigned int> &indices) {
   float levelCenterX = OkConfig::getFloat("level.center.x");
   float levelCenterY = OkConfig::getFloat("level.center.y");
-
   float height = isFloor ? static_cast<float>(sector.floor_height) * SCALE
                          : static_cast<float>(sector.ceiling_height) * SCALE;
 
-  // Create vertices with proper texture coordinates
-  unsigned int baseIndex = 0;  // Start from 0 since this is a new item
-
-  for (size_t i = 0; i < sectorVertices.size(); i++) {
-    if (sectorVertices[i] >= static_cast<int>(level.vertices.size())) {
-      continue;  // Skip invalid vertex indices
-    }
-
-    const WAD::Vertex &vertex = level.vertices[sectorVertices[i]];
-    // Apply the same coordinate transformation as walls
-    float x = (static_cast<float>(vertex.x) - levelCenterX) * SCALE;
-    float z = (static_cast<float>(vertex.y) - levelCenterY) * SCALE;
-
-    // Flats tile on the absolute world grid (origin 0,0) so adjacent sectors
-    // align, matching vanilla DOOM. GL_REPEAT tiles, so emit raw UVs (no
-    // per-vertex fmod, which would smear the texture across tile boundaries).
-    float u = static_cast<float>(vertex.x) / TEXTURE_SIZE;
-    float v = static_cast<float>(vertex.y) / TEXTURE_SIZE;
-
-    vertices.push_back(x);
-    vertices.push_back(height);
-    vertices.push_back(-z);  // Negate Z for proper coordinate system
-    vertices.push_back(u);
-    vertices.push_back(v);
+  // Build the sector's ordered boundary loops from its linedefs.
+  std::vector<std::vector<int> > loops = buildSectorLoops(level, sectorIndex);
+  if (loops.empty()) {
+    return;
   }
 
-  // Create triangles using a simple triangle fan
-  for (size_t i = 1; i < sectorVertices.size() - 1; i++) {
-    if (isFloor) {
-      // Floor - CCW winding
-      indices.push_back(baseIndex);                                 // Center
-      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
-      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
-    } else {
-      // Ceiling - Reverse winding
-      indices.push_back(baseIndex);  // Center
-      indices.push_back(baseIndex + static_cast<unsigned int>(i + 1));  // Next
-      indices.push_back(baseIndex + static_cast<unsigned int>(i));  // Current
+  // Classify loops into outer boundaries and holes: a loop is a hole when one
+  // of its vertices lies inside another, larger loop (its container).
+  std::vector<bool> isHole(loops.size(), false);
+  std::vector<int>  container(loops.size(), -1);
+  for (size_t a = 0; a < loops.size(); a++) {
+    double areaA = std::fabs(loopSignedArea2(level, loops[a]));
+    double px    = static_cast<double>(level.vertices[loops[a][0]].x);
+    double py    = static_cast<double>(level.vertices[loops[a][0]].y);
+    double smallest = std::numeric_limits<double>::max();
+    for (size_t b = 0; b < loops.size(); b++) {
+      if (a == b) {
+        continue;
+      }
+      double areaB = std::fabs(loopSignedArea2(level, loops[b]));
+      if (areaB <= areaA) {
+        continue;
+      }
+      if (pointInLoop(level, px, py, loops[b]) && areaB < smallest) {
+        smallest     = areaB;
+        container[a] = static_cast<int>(b);
+      }
+    }
+    if (container[a] != -1) {
+      isHole[a] = true;
+    }
+  }
+
+  // Triangulate each outer loop together with the holes it contains.
+  for (size_t a = 0; a < loops.size(); a++) {
+    if (isHole[a]) {
+      continue;
+    }
+
+    // Bridge every contained hole into the outer ring (one simple polygon).
+    std::vector<std::vector<int> > obstacles;
+    obstacles.push_back(loops[a]);
+    for (size_t b = 0; b < loops.size(); b++) {
+      if (isHole[b] && container[b] == static_cast<int>(a)) {
+        obstacles.push_back(loops[b]);
+      }
+    }
+    std::vector<int> ring = loops[a];
+    for (size_t b = 0; b < loops.size(); b++) {
+      if (isHole[b] && container[b] == static_cast<int>(a)) {
+        ring = bridgeHoleIntoOuter(level, ring, loops[b], obstacles);
+      }
+    }
+
+    // Emit GL vertices for this ring; indices below are relative to base.
+    unsigned int base = static_cast<unsigned int>(vertices.size() / 5);
+    for (size_t i = 0; i < ring.size(); i++) {
+      const WAD::Vertex &vertex = level.vertices[ring[i]];
+      float x = (static_cast<float>(vertex.x) - levelCenterX) * SCALE;
+      float z = (static_cast<float>(vertex.y) - levelCenterY) * SCALE;
+      // Flats tile on the absolute world grid (origin 0,0) so adjacent sectors
+      // align, matching vanilla DOOM. GL_REPEAT tiles, so emit raw UVs.
+      float u = static_cast<float>(vertex.x) / TEXTURE_SIZE;
+      float v = static_cast<float>(vertex.y) / TEXTURE_SIZE;
+      vertices.push_back(x);
+      vertices.push_back(height);
+      vertices.push_back(-z);  // Negate Z for the engine coordinate system
+      vertices.push_back(u);
+      vertices.push_back(v);
+    }
+
+    // Ear-clip and append triangles (ceiling uses reversed winding).
+    std::vector<unsigned int> tris;
+    earClip(level, ring, tris);
+    for (size_t t = 0; t + 3 <= tris.size(); t += 3) {
+      unsigned int i0 = base + tris[t];
+      unsigned int i1 = base + tris[t + 1];
+      unsigned int i2 = base + tris[t + 2];
+      if (isFloor) {
+        indices.push_back(i0);
+        indices.push_back(i1);
+        indices.push_back(i2);
+      } else {
+        indices.push_back(i0);
+        indices.push_back(i2);
+        indices.push_back(i1);
+      }
     }
   }
 }
