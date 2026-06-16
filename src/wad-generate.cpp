@@ -350,11 +350,34 @@ std::vector<std::vector<int> > buildSectorLoops(const WAD::Level &level,
         closed = true;
         break;
       }
-      int next = -1;
+      // At a junction (more than one of the sector's edges leaves this vertex)
+      // the greedy "first unused" pick can jump onto a different face and merge
+      // two distinct loops into one self-intersecting ring. Trace the face
+      // properly: among the unused outgoing edges, take the one that turns the
+      // most CLOCKWISE relative to the incoming direction (the right-hand
+      // boundary-following rule for our edge winding). This keeps touching
+      // inner/outer loops separate.
+      int    prevVertex = edgeA[cur];
+      double dinX        = static_cast<double>(level.vertices[endVertex].x) -
+                    static_cast<double>(level.vertices[prevVertex].x);
+      double dinY = static_cast<double>(level.vertices[endVertex].y) -
+                    static_cast<double>(level.vertices[prevVertex].y);
+      int    next     = -1;
+      double bestTurn = 0.0;
       for (size_t k = 0; k < edgeA.size(); k++) {
-        if (!used[k] && edgeA[k] == endVertex) {
-          next = static_cast<int>(k);
-          break;
+        if (used[k] || edgeA[k] != endVertex) {
+          continue;
+        }
+        double doutX = static_cast<double>(level.vertices[edgeB[k]].x) -
+                       static_cast<double>(level.vertices[endVertex].x);
+        double doutY = static_cast<double>(level.vertices[edgeB[k]].y) -
+                       static_cast<double>(level.vertices[endVertex].y);
+        double cross = dinX * doutY - dinY * doutX;
+        double dot   = dinX * doutX + dinY * doutY;
+        double turn  = std::atan2(cross, dot);  // (-pi, pi]; < 0 = clockwise
+        if (next == -1 || turn < bestTurn) {
+          bestTurn = turn;
+          next     = static_cast<int>(k);
         }
       }
       cur = next;
