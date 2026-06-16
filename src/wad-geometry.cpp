@@ -377,29 +377,33 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
           const WAD::Sector &sector1 = level.sectors[leftSide.sector];
           const WAD::Sector &sector2 = level.sectors[rightSide.sector];
 
-          // Create upper wall if ceilings differ
-          if (sector1.ceiling_height > sector2.ceiling_height) {
+          // Upper wall: DOOM draws this side's upper texture when THIS sector's
+          // ceiling is higher than the neighbour's; it fills the gap from the
+          // neighbour ceiling up to this ceiling.
+          if (sector2.ceiling_height > sector1.ceiling_height) {
             std::string textureName =
                 OkStrings::trimFixedString(rightSide.upper_texture, 8);
             if (!textureName.empty() && textureName != "-") {
               GeometryGroup &group = geometryGroups[textureName];
               group.textureName    = textureName;
-              createWallSection(v1, v2, sector2.ceiling_height,
-                                sector1.ceiling_height, textureName, 0,
+              createWallSection(v1, v2, sector1.ceiling_height,
+                                sector2.ceiling_height, textureName, 0,
                                 sector2.ceiling_height, linedef.flags, rightSide,
                                 group.vertices, group.indices);
             }
           }
 
-          // Create lower wall if floors differ
-          if (sector2.floor_height > sector1.floor_height) {
+          // Lower wall (step riser): drawn when THIS sector's floor is lower
+          // than the neighbour's, filling from this floor up to the neighbour
+          // floor with this side's lower texture.
+          if (sector2.floor_height < sector1.floor_height) {
             std::string textureName =
                 OkStrings::trimFixedString(rightSide.lower_texture, 8);
             if (!textureName.empty() && textureName != "-") {
               GeometryGroup &group = geometryGroups[textureName];
               group.textureName    = textureName;
-              createWallSection(v1, v2, sector1.floor_height,
-                                sector2.floor_height, textureName, 1,
+              createWallSection(v1, v2, sector2.floor_height,
+                                sector1.floor_height, textureName, 1,
                                 sector2.ceiling_height, linedef.flags, rightSide,
                                 group.vertices, group.indices);
             }
@@ -463,34 +467,36 @@ WADGeometry::createSectorWalls(const WAD::Level  &level,
         const WAD::Sector &sector1 = level.sectors[leftSide.sector];
         const WAD::Sector &sector2 = level.sectors[rightSide.sector];
 
-        // Create upper wall if ceilings differ (from left side perspective)
-        if (sector2.ceiling_height > sector1.ceiling_height) {
+        // Upper wall: drawn when THIS (left) sector's ceiling is higher than
+        // the neighbour's, filling from the neighbour ceiling up to this one.
+        // Keep the linedef's intrinsic v1->v2 order (same as the right side) so
+        // the texture U runs in the same direction on both sides; otherwise
+        // adjacent faces of e.g. a column come out mirrored. The engine does no
+        // backface culling, so winding does not matter here.
+        if (sector1.ceiling_height > sector2.ceiling_height) {
           std::string textureName =
               OkStrings::trimFixedString(leftSide.upper_texture, 8);
           if (!textureName.empty() && textureName != "-") {
             GeometryGroup &group = geometryGroups[textureName];
             group.textureName    = textureName;
-            // Keep the linedef's intrinsic v1->v2 order (same as the right
-            // side) so the texture U runs in the same direction on both sides;
-            // otherwise adjacent faces of e.g. a column come out mirrored. The
-            // engine does no backface culling, so winding does not matter here.
-            createWallSection(v1, v2, sector1.ceiling_height,
-                              sector2.ceiling_height, textureName, 0,
+            createWallSection(v1, v2, sector2.ceiling_height,
+                              sector1.ceiling_height, textureName, 0,
                               sector1.ceiling_height, linedef.flags, leftSide,
                               group.vertices, group.indices);
           }
         }
 
-        // Create lower wall if floors differ (from left side perspective)
-        if (sector1.floor_height > sector2.floor_height) {
+        // Lower wall (step riser): drawn when THIS (left) sector's floor is
+        // lower than the neighbour's, filling from this floor up to theirs.
+        if (sector1.floor_height < sector2.floor_height) {
           std::string textureName =
               OkStrings::trimFixedString(leftSide.lower_texture, 8);
           if (!textureName.empty() && textureName != "-") {
             GeometryGroup &group = geometryGroups[textureName];
             group.textureName    = textureName;
             // v1->v2 order (see upper-section note): consistent U on both sides.
-            createWallSection(v1, v2, sector2.floor_height,
-                              sector1.floor_height, textureName, 1,
+            createWallSection(v1, v2, sector1.floor_height,
+                              sector2.floor_height, textureName, 1,
                               sector1.ceiling_height, linedef.flags, leftSide,
                               group.vertices, group.indices);
           }
