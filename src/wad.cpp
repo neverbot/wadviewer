@@ -313,7 +313,16 @@ std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
   // Read patch names (8 bytes each, zero-terminated)
   const char *name_data = reinterpret_cast<const char *>(data.data() + 4);
   for (uint32_t i = 0; i < num_patches; i++) {
-    names.push_back(trimString(name_data + i * 8, 8));
+    std::string name = trimString(name_data + i * 8, 8);
+    // PNAMES entries are sometimes stored lower-case, but the actual patch
+    // lumps are upper-case and DOOM matches them case-insensitively. Normalise
+    // to upper-case so lookups resolve (e.g. TEKWALL4's "w94_1" -> "W94_1").
+    for (size_t c = 0; c < name.size(); c++) {
+      if (name[c] >= 'a' && name[c] <= 'z') {
+        name[c] = static_cast<char>(name[c] - ('a' - 'A'));
+      }
+    }
+    names.push_back(name);
   }
 
   return names;
@@ -433,6 +442,13 @@ void WAD::processWAD() {
     std::cout << "WAD :: Found " << patchNames.size()
               << " patch names in PNAMES\n";
 
+    // Index the patch store by PNAMES index (not a compacted list): texture
+    // definitions reference patches by their PNAMES index (patch_num), so a
+    // compacted array only works by luck when the required indices happen to be
+    // contiguous. Pre-size and fill by index so any WAD resolves correctly;
+    // unloaded slots stay empty and are skipped at composite time.
+    allPatches.assign(patchNames.size(), PatchData());
+
     // Create a set of required patch indices from textures
     std::vector<bool> requiredPatches(patchNames.size(), false);
     for (size_t i = 0; i < allTextures.size(); i++) {
@@ -531,10 +547,10 @@ void WAD::processWAD() {
         for (size_t p = 0; p < patchNames.size(); p++) {
           if (!patchLoaded[p] && requiredPatches[p] &&
               patchNames[p] == patchName) {
-            // Load the patch
+            // Load the patch (store at its PNAMES index)
             PatchData patch =
                 readPatch(directory_[i].filepos, directory_[i].size, patchName);
-            allPatches.push_back(patch);
+            allPatches[p]  = patch;
             patchLoaded[p] = true;
             sectionLoaded++;
             totalLoaded++;
@@ -554,8 +570,8 @@ void WAD::processWAD() {
         if (!patchLoaded[p] && requiredPatches[p]) {
           if (findLump(patchNames[p], offset, size, 0)) {
             PatchData patch = readPatch(offset, size, patchNames[p]);
-            allPatches.push_back(patch);
-            patchLoaded[p] = true;
+            allPatches[p]   = patch;
+            patchLoaded[p]  = true;
             directLoaded++;
             totalLoaded++;
           }
