@@ -368,9 +368,10 @@ int main(int argc, char *argv[]) {
     // ******************************************************************************************
 
     // clang-format off
-    if (argc < 2 || argc > 7) {
-      std::cout << "Usage: wadviewer [-format] <content_file> [<level_name>] [--verbose] [--mcp] [--no-input]\n";
+    if (argc < 2 || argc > 11) {
+      std::cout << "Usage: wadviewer [-format] [-iwad <iwad_file>] <content_file> [<level_name>] [--verbose] [--mcp] [--no-input]\n";
       std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
+      std::cout << "  -iwad <file>: Optional base IWAD loaded first for shared resources (e.g. doom2.wad for DOOM II PWADs)\n";
       std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
       std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
       std::cout << "  --verbose   : Optional. Enable verbose debug output\n";
@@ -382,12 +383,18 @@ int main(int argc, char *argv[]) {
 
     // WADFormat   format = WADFormat::WAD;  // Default format
     std::string contentFile;
-    std::string levelName = "";     // Empty string means use first level
+    std::string iwadFile   = "";     // Optional base IWAD (resources)
+    std::string levelName  = "";     // Empty string means use first level
     bool        verbose    = false;  // Default: not verbose
-    bool        mcpEnabled  = false;  // Enable the in-engine MCP server
-    bool        noInput     = false;  // Ignore physical input (MCP-only)
+    bool        mcpEnabled = false;  // Enable the in-engine MCP server
+    bool        noInput    = false;  // Ignore physical input (MCP-only)
 
-    // Scan all arguments for optional flags.
+    // Single pass over the arguments: collect flags, the optional base IWAD
+    // (-iwad <path>) and the positional content file / level name. Format
+    // selectors (-wad/-json/-dsl) are accepted but currently ignored (only WAD
+    // is wired). Anything not recognised as a flag is positional: the first
+    // positional is the content file, the second the level name.
+    std::vector<std::string> positionals;
     for (int i = 1; i < argc; i++) {
       std::string arg = argv[i];
       if (arg == "--verbose") {
@@ -396,38 +403,41 @@ int main(int argc, char *argv[]) {
         mcpEnabled = true;
       } else if (arg == "--no-input") {
         noInput = true;
+      } else if (arg == "-iwad") {
+        if (i + 1 < argc) {
+          iwadFile = argv[++i];  // consume the path that follows
+        } else {
+          std::cerr << "-iwad requires a path argument\n";
+          return 1;
+        }
+      } else if (arg == "-wad" || arg == "-json" || arg == "-dsl") {
+        // Format selector (only WAD is active today); ignored.
+      } else {
+        positionals.push_back(arg);
       }
     }
 
-    // Check if first argument is a format specification
-    if (argv[1][0] == '-' && std::string(argv[1]) != "--verbose") {
-      // std::string formatStr = argv[1];
-      // formatStr             = formatStr.substr(1);  // Remove the leading '-'
-
-      // if (formatStr == "wad") {
-      //   format = WADFormat::WAD;
-      // } else if (formatStr == "json") {
-      //   format = WADFormat::JSON;
-      // } else if (formatStr == "dsl") {
-      //   format = WADFormat::DSL;
-      // } else {
-      //   std::cerr << "Invalid format specified. Using default (wad)\n";
-      // }
-
-      contentFile = argv[2];
-      if (argc >= 4 && std::string(argv[3]) != "--verbose") {
-        levelName = argv[3];
-      }
-    } else {
-      // No format specified, use defaults
-      contentFile = argv[1];
-      if (argc >= 3 && std::string(argv[2]) != "--verbose") {
-        levelName = argv[2];
-      }
+    if (positionals.empty()) {
+      std::cerr << "No content file given.\n";
+      return 1;
+    }
+    contentFile = positionals[0];
+    if (positionals.size() >= 2) {
+      levelName = positionals[1];
     }
 
     try {
-      WAD wad(contentFile, verbose);  // Pass verbose flag
+      // With a base IWAD, load it first (resources) then the content WAD on top
+      // so a DOOM II PWAD's maps resolve the IWAD's textures/flats/palette.
+      // Without one, the list holds just the content file (unchanged
+      // behaviour).
+      std::vector<std::string> wadFiles;
+      if (!iwadFile.empty()) {
+        wadFiles.push_back(iwadFile);
+      }
+      wadFiles.push_back(contentFile);
+
+      WAD wad(wadFiles, verbose);
       wad.processWAD();
 
       // If no level name was provided, use the first level

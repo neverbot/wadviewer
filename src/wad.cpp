@@ -37,56 +37,81 @@ static std::string trimString(const std::string &str, size_t maxLen) {
  * file
  */
 WAD::WAD(const std::string &filepath, bool verbose) {
-  filepath_ = filepath;
-  verbose_  = verbose;
-
-  std::ifstream file(filepath_, std::ios::binary);
-
-  if (!file) {
-    throw std::runtime_error("Unable to open WAD file: " + filepath_);
-  }
-
-  // Read header
-  file.read(reinterpret_cast<char *>(&header_), sizeof(Header));
-  if (!file) {
-    throw std::runtime_error("Unable to read WAD header");
-  }
-
-  // Verify WAD type
-  std::string id(header_.identification, 4);
-  if (id != "IWAD" && id != "PWAD") {
-    throw std::runtime_error("Not a valid WAD file");
-  }
-
-  if (verbose_) {
-    std::cout << "WAD type: " << id << "\n";
-    std::cout << "Num lumps: " << header_.numlumps << "\n";
-  }
-
-  // Read directory
-  readDirectory();
+  verbose_ = verbose;
+  addSource(filepath);
 }
 
 /**
- * @brief Read the WAD directory
- * @throws std::runtime_error if the directory cannot be read
+ * @brief WAD constructor for a merged archive (IWAD + PWAD(s))
+ * @param filepaths Source files in load order: IWAD (resources) first, then the
+ *        PWAD(s) on top. Later files override/append earlier ones by lump name.
+ * @param verbose Enable verbose output
  */
-void WAD::readDirectory() {
-  // Open the WAD file in binary mode.
-  std::ifstream file(filepath_, std::ios::binary);
+WAD::WAD(const std::vector<std::string> &filepaths, bool verbose) {
+  verbose_ = verbose;
+  for (size_t i = 0; i < filepaths.size(); i++) {
+    addSource(filepaths[i]);
+  }
+}
 
-  // Move the file read position to the start of the directory, using the
-  // offset from the header (header_.infotableofs).
-  file.seekg(header_.infotableofs);
+/**
+ * @brief Load one source file and append its lumps to the merged archive
+ * @param filepath Path to the WAD file
+ * @throws std::runtime_error if the file cannot be opened or is not a valid WAD
+ * @note The whole file is read into memory (sourceData_); lump reads then index
+ *       into that buffer instead of reopening the file once per lump.
+ */
+void WAD::addSource(const std::string &filepath) {
+  std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+  if (!file) {
+    throw std::runtime_error("Unable to open WAD file: " + filepath);
+  }
 
-  // Prepare the directory_ vector to hold all directory entries. The number of
-  // entries is specified in the header (header_.numlumps).
-  directory_.resize(header_.numlumps);
+  // Read the entire file into memory.
+  std::streamoff fileSize = file.tellg();
+  file.seekg(0);
+  std::vector<uint8_t> bytes(static_cast<size_t>(fileSize));
+  file.read(reinterpret_cast<char *>(bytes.data()),
+            static_cast<std::streamsize>(fileSize));
+  if (!file) {
+    throw std::runtime_error("Unable to read WAD file: " + filepath);
+  }
 
-  // Read the entire directory into memory: each lump has a fixed-size record
-  // (16 bytes), and we read all of them at once.
-  file.read(reinterpret_cast<char *>(directory_.data()),
-            static_cast<std::streamsize>(header_.numlumps * sizeof(Directory)));
+  // Parse the header from the in-memory bytes.
+  if (bytes.size() < sizeof(Header)) {
+    throw std::runtime_error("Truncated WAD header: " + filepath);
+  }
+  Header header;
+  std::memcpy(&header, bytes.data(), sizeof(Header));
+
+  std::string id(header.identification, 4);
+  if (id != "IWAD" && id != "PWAD") {
+    throw std::runtime_error("Not a valid WAD file: " + filepath);
+  }
+
+  if (verbose_) {
+    std::cout << "WAD :: Loading " << id << " " << filepath << " ("
+              << header.numlumps << " lumps)\n";
+  }
+
+  // Register the source and append its directory entries, tagging each with the
+  // source index so later reads know which file's bytes to index into.
+  size_t sourceIndex = sources_.size();
+  sources_.push_back(filepath);
+  sourceData_.push_back(std::vector<uint8_t>());
+  sourceData_.back().swap(bytes);
+
+  const std::vector<uint8_t> &data = sourceData_[sourceIndex];
+  for (uint32_t i = 0; i < header.numlumps; i++) {
+    size_t entryOffset = header.infotableofs + i * sizeof(Directory);
+    if (entryOffset + sizeof(Directory) > data.size()) {
+      break;  // Truncated directory; stop rather than read past the buffer.
+    }
+    Directory entry;
+    std::memcpy(&entry, data.data() + entryOffset, sizeof(Directory));
+    directory_.push_back(entry);
+    lumpSource_.push_back(sourceIndex);
+  }
 }
 
 /**
@@ -97,17 +122,17 @@ void WAD::readDirectory() {
 bool WAD::isLevelMarker(const std::string &name) {
   std::string cleanName = trimString(name, 8);
 
-  // DOOM 1 level names are ExMy (x = episode, y = mission)
+  // DOOM 1 level names are ExMy (x = episode, y = mission). (No logging here:
+  // this predicate is called in hot loops -- levels are logged once when
+  // enumerated in processWAD.)
   if (cleanName.length() == 4 && cleanName[0] == 'E' && cleanName[2] == 'M' &&
       std::isdigit(cleanName[1]) && std::isdigit(cleanName[3])) {
-    std::cout << "WAD :: Found DOOM1 level in WAD file: " << cleanName << "\n";
     return true;
   }
 
   // DOOM 2 level names are MAPxx (xx = 01-32)
   if (cleanName.length() == 5 && cleanName.substr(0, 3) == "MAP" &&
       std::isdigit(cleanName[3]) && std::isdigit(cleanName[4])) {
-    std::cout << "WAD :: Found DOOM2 level in WAD file: " << cleanName << "\n";
     return true;
   }
 
@@ -115,14 +140,15 @@ bool WAD::isLevelMarker(const std::string &name) {
 }
 
 /**
- * @brief Find a lump by name
+ * @brief Find the first lump named `name` at or after `startIndex`
  * @param name Lump name
- * @param offset Offset of the lump in the file
- * @param size Size of the lump
- * @param startIndex Index to start searching from
+ * @param loc Filled with the lump location (source + byte range) when found
+ * @param startIndex Directory index to start searching from
  * @return true if the lump is found, false otherwise
+ * @note Forward first-match: used for a map's sub-lumps, which follow their
+ *       level marker in the same source segment.
  */
-bool WAD::findLump(const std::string &name, uint32_t &offset, uint32_t &size,
+bool WAD::findLump(const std::string &name, LumpLoc &loc,
                    size_t startIndex) const {
   for (size_t i = startIndex; i < directory_.size(); i++) {
     std::string lumpName = trimString(directory_[i].name, 8);
@@ -137,8 +163,9 @@ bool WAD::findLump(const std::string &name, uint32_t &offset, uint32_t &size,
     }
 
     if (lumpName == name) {
-      offset = directory_[i].filepos;
-      size   = directory_[i].size;
+      loc.source = lumpSource_[i];
+      loc.offset = directory_[i].filepos;
+      loc.size   = directory_[i].size;
       return true;
     }
   }
@@ -147,22 +174,56 @@ bool WAD::findLump(const std::string &name, uint32_t &offset, uint32_t &size,
 }
 
 /**
- * @brief Read a lump from the WAD file
- * @param offset Offset of the lump in the file
- * @param size Size of the lump
- * @return Vector containing the lump data
- * @throws std::runtime_error if the lump cannot be read
+ * @brief Find the last lump with the given name (override-aware)
+ * @param name Lump name
+ * @param loc Filled with the lump location when found
+ * @return true if found
+ * @note Scans the whole merged archive and returns the LAST match, so a lump in
+ *       a later source (PWAD) shadows the same-named lump in an earlier one
+ *       (IWAD) -- DOOM's "last-wins" rule for shared resources and maps.
  */
-std::vector<uint8_t> WAD::readLump(std::streamoff offset, std::size_t size) {
-  std::vector<uint8_t> data(size);
-  std::ifstream        file(filepath_, std::ios::binary);
-  if (!file) {
-    throw std::runtime_error("Unable to open file: " + filepath_);
+bool WAD::findLastLump(const std::string &name, LumpLoc &loc) const {
+  bool found = false;
+  for (size_t i = 0; i < directory_.size(); i++) {
+    if (trimString(directory_[i].name, 8) == name) {
+      loc.source = lumpSource_[i];
+      loc.offset = directory_[i].filepos;
+      loc.size   = directory_[i].size;
+      found      = true;
+    }
   }
-  file.seekg(offset);
-  file.read(reinterpret_cast<char *>(data.data()),
-            static_cast<std::streamsize>(size));
-  return data;
+  return found;
+}
+
+/**
+ * @brief Whether a level marker with this name occurs after the given index
+ * @note Used to skip a shadowed level (e.g. the IWAD's MAP01 when a PWAD also
+ *       provides MAP01) so the later copy is the one enumerated.
+ */
+bool WAD::hasLevelMarkerAfter(const std::string &name,
+                              size_t             afterIndex) const {
+  for (size_t i = afterIndex + 1; i < directory_.size(); i++) {
+    if (isLevelMarker(directory_[i].name) &&
+        trimString(directory_[i].name, 8) == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @brief Read a lump's raw bytes from the source file that owns it
+ * @param loc Lump location (source + byte range)
+ * @return Vector containing the lump data
+ */
+std::vector<uint8_t> WAD::readLump(const LumpLoc &loc) const {
+  const std::vector<uint8_t> &data = sourceData_[loc.source];
+  size_t                      end  = static_cast<size_t>(loc.offset) + loc.size;
+  if (end > data.size()) {
+    throw std::runtime_error("Lump extends past end of source: " +
+                             sources_[loc.source]);
+  }
+  return std::vector<uint8_t>(data.begin() + loc.offset, data.begin() + end);
 }
 
 /**
@@ -171,11 +232,10 @@ std::vector<uint8_t> WAD::readLump(std::streamoff offset, std::size_t size) {
  * @param size Size of the vertices
  * @return Vector containing the vertices
  */
-std::vector<WAD::Vertex> WAD::readVertices(std::streamoff offset,
-                                           std::size_t    size) {
-  auto                data = readLump(offset, size);
-  std::vector<Vertex> vertices(size / sizeof(Vertex));
-  std::memcpy(vertices.data(), data.data(), size);
+std::vector<WAD::Vertex> WAD::readVertices(const LumpLoc &loc) const {
+  std::vector<uint8_t> data = readLump(loc);
+  std::vector<Vertex>  vertices(loc.size / sizeof(Vertex));
+  std::memcpy(vertices.data(), data.data(), loc.size);
   return vertices;
 }
 
@@ -185,11 +245,10 @@ std::vector<WAD::Vertex> WAD::readVertices(std::streamoff offset,
  * @param size Size of the linedefs
  * @return Vector containing the linedefs
  */
-std::vector<WAD::Linedef> WAD::readLinedefs(std::streamoff offset,
-                                            std::size_t    size) {
-  auto                 data = readLump(offset, size);
-  std::vector<Linedef> linedefs(size / sizeof(Linedef));
-  std::memcpy(linedefs.data(), data.data(), size);
+std::vector<WAD::Linedef> WAD::readLinedefs(const LumpLoc &loc) const {
+  std::vector<uint8_t> data = readLump(loc);
+  std::vector<Linedef> linedefs(loc.size / sizeof(Linedef));
+  std::memcpy(linedefs.data(), data.data(), loc.size);
   return linedefs;
 }
 
@@ -199,11 +258,10 @@ std::vector<WAD::Linedef> WAD::readLinedefs(std::streamoff offset,
  * @param size Size of the sidedefs
  * @return Vector containing the sidedefs
  */
-std::vector<WAD::Sidedef> WAD::readSidedefs(std::streamoff offset,
-                                            std::size_t    size) {
-  auto                 data = readLump(offset, size);
-  std::vector<Sidedef> sidedefs(size / sizeof(Sidedef));
-  std::memcpy(sidedefs.data(), data.data(), size);
+std::vector<WAD::Sidedef> WAD::readSidedefs(const LumpLoc &loc) const {
+  std::vector<uint8_t> data = readLump(loc);
+  std::vector<Sidedef> sidedefs(loc.size / sizeof(Sidedef));
+  std::memcpy(sidedefs.data(), data.data(), loc.size);
   return sidedefs;
 }
 
@@ -213,11 +271,10 @@ std::vector<WAD::Sidedef> WAD::readSidedefs(std::streamoff offset,
  * @param size Size of the sectors
  * @return Vector containing the sectors
  */
-std::vector<WAD::Sector> WAD::readSectors(std::streamoff offset,
-                                          std::size_t    size) {
-  auto                data = readLump(offset, size);
-  std::vector<Sector> sectors(size / sizeof(Sector));
-  std::memcpy(sectors.data(), data.data(), size);
+std::vector<WAD::Sector> WAD::readSectors(const LumpLoc &loc) const {
+  std::vector<uint8_t> data = readLump(loc);
+  std::vector<Sector>  sectors(loc.size / sizeof(Sector));
+  std::memcpy(sectors.data(), data.data(), loc.size);
   return sectors;
 }
 
@@ -227,11 +284,10 @@ std::vector<WAD::Sector> WAD::readSectors(std::streamoff offset,
  * @param size Size of the things
  * @return Vector containing the things
  */
-std::vector<WAD::Thing> WAD::readThings(std::streamoff offset,
-                                        std::size_t    size) {
-  auto               data = readLump(offset, size);
-  std::vector<Thing> things(size / sizeof(Thing));
-  std::memcpy(things.data(), data.data(), size);
+std::vector<WAD::Thing> WAD::readThings(const LumpLoc &loc) const {
+  std::vector<uint8_t> data = readLump(loc);
+  std::vector<Thing>   things(loc.size / sizeof(Thing));
+  std::memcpy(things.data(), data.data(), loc.size);
   return things;
 }
 
@@ -242,10 +298,10 @@ std::vector<WAD::Thing> WAD::readThings(std::streamoff offset,
  * @param name Name of the patch
  * @return PatchData containing the converted patch
  */
-WAD::PatchData WAD::readPatch(std::streamoff offset, std::size_t size,
-                              const std::string &name) {
-  auto      data = readLump(offset, size);
-  PatchData patch;
+WAD::PatchData WAD::readPatch(const LumpLoc     &loc,
+                              const std::string &name) const {
+  std::vector<uint8_t> data = readLump(loc);
+  PatchData            patch;
   std::strncpy(patch.name, name.c_str(), 8);  // Copy name to char array
 
   // Read patch header
@@ -298,9 +354,8 @@ WAD::PatchData WAD::readPatch(std::streamoff offset, std::size_t size,
  * @param size Size of the patch names
  * @return Vector containing the patch names
  */
-std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
-                                             std::size_t    size) {
-  auto                     data = readLump(offset, size);
+std::vector<std::string> WAD::readPatchNames(const LumpLoc &loc) const {
+  std::vector<uint8_t>     data = readLump(loc);
   std::vector<std::string> names;
 
   // First 4 bytes is number of patches
@@ -334,9 +389,8 @@ std::vector<std::string> WAD::readPatchNames(std::streamoff offset,
  * @param size Size of the texture definitions
  * @return Vector containing the texture definitions
  */
-std::vector<WAD::TextureDef> WAD::readTextureDefs(std::streamoff offset,
-                                                  std::size_t    size) {
-  auto                    data = readLump(offset, size);
+std::vector<WAD::TextureDef> WAD::readTextureDefs(const LumpLoc &loc) const {
+  std::vector<uint8_t>    data = readLump(loc);
   std::vector<TextureDef> textures;
 
   // First 4 bytes is number of textures
@@ -390,10 +444,9 @@ std::vector<WAD::TextureDef> WAD::readTextureDefs(std::streamoff offset,
  * @param size Size of the palette
  * @return Vector containing the palette colors
  */
-std::vector<WAD::Color> WAD::readPalette(std::streamoff offset,
-                                         std::size_t    size) {
+std::vector<WAD::Color> WAD::readPalette(const LumpLoc &loc) const {
   std::vector<Color>   palette(256);  // DOOM palette has 256 colors
-  std::vector<uint8_t> data = readLump(offset, size);
+  std::vector<uint8_t> data = readLump(loc);
 
   // First palette is at offset 0
   for (int i = 0; i < 256; i++) {
@@ -413,32 +466,37 @@ std::vector<WAD::Color> WAD::readPalette(std::streamoff offset,
  *       to the console.
  */
 void WAD::processWAD() {
-  uint32_t                 offset, size;
+  LumpLoc                  loc;
   std::vector<TextureDef>  allTextures;
   std::vector<PatchData>   allPatches;
   std::vector<Color>       palette;
   std::vector<std::string> patchNames;
 
+  // Shared resources (palette, textures, patch names, patches) use override-
+  // aware lookups (findLastLump): when an IWAD and a PWAD both define a lump,
+  // the PWAD's (loaded later) wins, matching DOOM. A resource-less PWAD falls
+  // through to the IWAD's copy, which is what lets DOOM II map packs render.
+
   // First load PLAYPAL (needed for texture conversion)
-  if (findLump("PLAYPAL", offset, size, 0)) {
-    palette = readPalette(offset, size);
+  if (findLastLump("PLAYPAL", loc)) {
+    palette = readPalette(loc);
     std::cout << "WAD :: Loaded PLAYPAL (palette data)\n";
   }
 
   // Then load TEXTURE1/TEXTURE2 to know which patches we actually need
-  if (findLump("TEXTURE1", offset, size, 0)) {
-    std::vector<TextureDef> tex1 = readTextureDefs(offset, size);
+  if (findLastLump("TEXTURE1", loc)) {
+    std::vector<TextureDef> tex1 = readTextureDefs(loc);
     allTextures.insert(allTextures.end(), tex1.begin(), tex1.end());
   }
 
-  if (findLump("TEXTURE2", offset, size, 0)) {
-    std::vector<TextureDef> tex2 = readTextureDefs(offset, size);
+  if (findLastLump("TEXTURE2", loc)) {
+    std::vector<TextureDef> tex2 = readTextureDefs(loc);
     allTextures.insert(allTextures.end(), tex2.begin(), tex2.end());
   }
 
   // Load PNAMES (needed to map patch numbers to names)
-  if (findLump("PNAMES", offset, size, 0)) {
-    patchNames = readPatchNames(offset, size);
+  if (findLastLump("PNAMES", loc)) {
+    patchNames = readPatchNames(loc);
     std::cout << "WAD :: Found " << patchNames.size()
               << " patch names in PNAMES\n";
 
@@ -474,8 +532,8 @@ void WAD::processWAD() {
       if (requiredPatches[i]) {
         requiredCount++;
         // Try to find this patch
-        uint32_t pOffset, pSize;
-        if (!findLump(patchNames[i], pOffset, pSize, 0)) {
+        LumpLoc patchLoc;
+        if (!findLastLump(patchNames[i], patchLoc)) {
           missingPatches.push_back(patchNames[i]);
         }
       }
@@ -508,9 +566,9 @@ void WAD::processWAD() {
 
     // Find all patch marker sections
     for (size_t s = 0; s < 3; s++) {
-      uint32_t startOffset, startSize, endOffset, endSize;
-      if (findLump(sections[s].start, startOffset, startSize, 0) &&
-          findLump(sections[s].end, endOffset, endSize, 0)) {
+      LumpLoc startLoc, endLoc;
+      if (findLastLump(sections[s].start, startLoc) &&
+          findLastLump(sections[s].end, endLoc)) {
         sections[s].found = true;
         // Find section indices
         for (size_t i = 0; i < directory_.size(); i++) {
@@ -548,10 +606,13 @@ void WAD::processWAD() {
           if (!patchLoaded[p] && requiredPatches[p] &&
               patchNames[p] == patchName) {
             // Load the patch (store at its PNAMES index)
-            PatchData patch =
-                readPatch(directory_[i].filepos, directory_[i].size, patchName);
-            allPatches[p]  = patch;
-            patchLoaded[p] = true;
+            LumpLoc patchLoc;
+            patchLoc.source = lumpSource_[i];
+            patchLoc.offset = directory_[i].filepos;
+            patchLoc.size   = directory_[i].size;
+            PatchData patch = readPatch(patchLoc, patchName);
+            allPatches[p]   = patch;
+            patchLoaded[p]  = true;
             sectionLoaded++;
             totalLoaded++;
             break;
@@ -568,8 +629,9 @@ void WAD::processWAD() {
       size_t directLoaded = 0;
       for (size_t p = 0; p < patchNames.size(); p++) {
         if (!patchLoaded[p] && requiredPatches[p]) {
-          if (findLump(patchNames[p], offset, size, 0)) {
-            PatchData patch = readPatch(offset, size, patchNames[p]);
+          LumpLoc patchLoc;
+          if (findLastLump(patchNames[p], patchLoc)) {
+            PatchData patch = readPatch(patchLoc, patchNames[p]);
             allPatches[p]   = patch;
             patchLoaded[p]  = true;
             directLoaded++;
@@ -592,6 +654,13 @@ void WAD::processWAD() {
     std::string lumpName = trimString(directory_[i].name, 8);
 
     if (isLevelMarker(lumpName)) {
+      // Skip a level marker that a later source overrides: when an IWAD and a
+      // PWAD both define MAP01, only the PWAD's (last) copy is enumerated.
+      if (hasLevelMarkerAfter(lumpName, i)) {
+        continue;
+      }
+
+      std::cout << "WAD :: Found level " << lumpName << "\n";
       Level level;
       std::strncpy(level.name, lumpName.c_str(), 8);
       level.texture_defs = allTextures;
@@ -599,22 +668,23 @@ void WAD::processWAD() {
       level.patch_names  = patchNames;
       level.palette      = palette;
 
-      // Load level data (VERTEXES, LINEDEFS, etc.)
-      uint32_t vOffset, vSize;
-      if (findLump("VERTEXES", vOffset, vSize, i + 1)) {
-        level.vertices = readVertices(vOffset, vSize);
+      // Load level data (VERTEXES, LINEDEFS, etc.). These sub-lumps follow the
+      // marker in the same source, so a forward first-match search is correct.
+      LumpLoc subLoc;
+      if (findLump("VERTEXES", subLoc, i + 1)) {
+        level.vertices = readVertices(subLoc);
       }
-      if (findLump("LINEDEFS", vOffset, vSize, i + 1)) {
-        level.linedefs = readLinedefs(vOffset, vSize);
+      if (findLump("LINEDEFS", subLoc, i + 1)) {
+        level.linedefs = readLinedefs(subLoc);
       }
-      if (findLump("SIDEDEFS", vOffset, vSize, i + 1)) {
-        level.sidedefs = readSidedefs(vOffset, vSize);
+      if (findLump("SIDEDEFS", subLoc, i + 1)) {
+        level.sidedefs = readSidedefs(subLoc);
       }
-      if (findLump("SECTORS", vOffset, vSize, i + 1)) {
-        level.sectors = readSectors(vOffset, vSize);
+      if (findLump("SECTORS", subLoc, i + 1)) {
+        level.sectors = readSectors(subLoc);
       }
-      if (findLump("THINGS", vOffset, vSize, i + 1)) {
-        level.things = readThings(vOffset, vSize);
+      if (findLump("THINGS", subLoc, i + 1)) {
+        level.things = readThings(subLoc);
       }
 
       // Load player start position (Thing type 1)
@@ -640,12 +710,13 @@ void WAD::processWAD() {
         }
       }
 
-      // Load each unique flat texture
+      // Load each unique flat texture (override-aware: a PWAD flat shadows the
+      // IWAD's; a resource-less PWAD resolves flats from the IWAD).
       for (std::set<std::string>::iterator it = uniqueFlats.begin();
            it != uniqueFlats.end(); ++it) {
-        uint32_t offset, size;
-        if (findLump(*it, offset, size, 0)) {
-          std::vector<uint8_t> flatData = readLump(offset, size);
+        LumpLoc flatLoc;
+        if (findLastLump(*it, flatLoc)) {
+          std::vector<uint8_t> flatData = readLump(flatLoc);
           if (flatData.size() == 64 * 64) {  // DOOM flats are always 64x64
             FlatData flat;
             std::strncpy(flat.name, it->c_str(), 8);

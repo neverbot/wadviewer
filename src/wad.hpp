@@ -43,8 +43,14 @@ enum class WADFormat : std::uint8_t {
  */
 class WAD {
 public:
-  // Constructor takes WAD file path
+  // Constructor takes a single WAD file path (IWAD or PWAD on its own).
   explicit WAD(const std::string &filepath, bool verbose = false);
+
+  // Constructor takes several WAD files to merge, in load order: the IWAD
+  // (resources) first, then PWAD(s) on top. Later files override/append to
+  // earlier ones by lump name (DOOM's "last-wins" rule), so a DOOM II PWAD's
+  // maps render with the IWAD's textures, flats and palette.
+  explicit WAD(const std::vector<std::string> &filepaths, bool verbose = false);
 
   // WAD header structure
   struct Header {
@@ -186,40 +192,58 @@ public:
   std::string getLevelNameByIndex(int index) const;
 
 private:
-  bool                   verbose_;
-  std::string            filepath_;
-  Header                 header_;
-  std::vector<Directory> directory_;
-  std::vector<PatchData> patches_;
+  // Location of a lump within the merged archive: which source file it came
+  // from plus its byte range inside that file.
+  struct LumpLoc {
+    std::size_t source;  // index into sources_ / sourceData_
+    uint32_t    offset;  // byte offset of the lump inside that source
+    uint32_t    size;    // lump size in bytes
+  };
+
+  bool verbose_;
+
+  // The merged archive: one or more source files in load order (IWAD first,
+  // PWAD(s) after). Each source's bytes are kept in memory; the combined
+  // directory_ lists every lump and lumpSource_ records which source owns it.
+  std::vector<std::string>          sources_;
+  std::vector<std::vector<uint8_t>> sourceData_;
+  std::vector<Directory>            directory_;
+  std::vector<std::size_t>          lumpSource_;
+  std::vector<PatchData>            patches_;
 
   // List of levels in the WAD file
   std::vector<Level> levels_;
 
-  // Method to read the WAD directory
-  void        readDirectory();
+  // Load one source file (header + directory) and append its lumps to the
+  // merged archive. Sources are added in priority order (IWAD then PWAD).
+  void        addSource(const std::string &filepath);
   static bool isLevelMarker(const std::string &name);
 
-  // Method to find a lump by name
-  bool findLump(const std::string &name, uint32_t &offset, uint32_t &size,
-                size_t startIndex) const;
-  // Method to read a lump from the WAD file
-  std::vector<uint8_t> readLump(std::streamoff offset, std::size_t size);
+  // Find the FIRST lump named `name` at or after `startIndex`. Used to read a
+  // map's sub-lumps (VERTEXES, LINEDEFS, ...) that immediately follow their
+  // level marker in the same source segment.
+  bool findLump(const std::string &name, LumpLoc &loc, size_t startIndex) const;
+  // Find the LAST lump named `name` in the whole archive (override-aware). Used
+  // for shared resources and level markers, so a PWAD lump shadows the IWAD's.
+  bool findLastLump(const std::string &name, LumpLoc &loc) const;
+  // Whether a level marker with the given name occurs after `afterIndex` (so an
+  // earlier, shadowed copy can be skipped during level enumeration).
+  bool hasLevelMarkerAfter(const std::string &name, size_t afterIndex) const;
 
-  // Methods to read lumps by type
-  // These methods will read the lump data and return a vector of the
-  // appropriate type
-  std::vector<Vertex>  readVertices(std::streamoff offset, std::size_t size);
-  std::vector<Linedef> readLinedefs(std::streamoff offset, std::size_t size);
-  std::vector<Sidedef> readSidedefs(std::streamoff offset, std::size_t size);
-  std::vector<Sector>  readSectors(std::streamoff offset, std::size_t size);
-  std::vector<Thing>   readThings(std::streamoff offset, std::size_t size);
-  std::vector<std::string> readPatchNames(std::streamoff offset,
-                                          std::size_t    size);
-  std::vector<TextureDef>  readTextureDefs(std::streamoff offset,
-                                           std::size_t    size);
-  PatchData                readPatch(std::streamoff offset, std::size_t size,
-                                     const std::string &name);
-  std::vector<Color>       readPalette(std::streamoff offset, std::size_t size);
+  // Read a lump's raw bytes from the source file that owns it.
+  std::vector<uint8_t> readLump(const LumpLoc &loc) const;
+
+  // Methods to read lumps by type. These read the lump data and return a vector
+  // of the appropriate type.
+  std::vector<Vertex>      readVertices(const LumpLoc &loc) const;
+  std::vector<Linedef>     readLinedefs(const LumpLoc &loc) const;
+  std::vector<Sidedef>     readSidedefs(const LumpLoc &loc) const;
+  std::vector<Sector>      readSectors(const LumpLoc &loc) const;
+  std::vector<Thing>       readThings(const LumpLoc &loc) const;
+  std::vector<std::string> readPatchNames(const LumpLoc &loc) const;
+  std::vector<TextureDef>  readTextureDefs(const LumpLoc &loc) const;
+  PatchData readPatch(const LumpLoc &loc, const std::string &name) const;
+  std::vector<Color> readPalette(const LumpLoc &loc) const;
 };
 
 #endif  // WAD_HPP
