@@ -71,18 +71,41 @@ xmake run wadviewer <content_file> [<level_name>]
 xmake run wadviewer -wad <content_file> [<level_name>]
 xmake run wadviewer -json <content_file> [<level_name>]
 xmake run wadviewer -dsl <content_file> [<level_name>]
+
+# With a base IWAD for shared resources (textures/flats/palette)
+xmake run wadviewer -iwad <iwad_file> <content_file> [<level_name>]
 ```
 
 Example:
 ```bash
 xmake run wadviewer wads/doom1.wad E1M1
+
+# A DOOM II PWAD (only maps inside) rendered with doom2.wad's textures:
+xmake run wadviewer -iwad wads/doom2.wad wads/mymegawad.wad MAP01
 ```
+
+### IWAD + PWAD loading
+
+Most third-party WADs are **PWADs**: they contain only the level lumps
+(geometry) and reuse the textures, flats and palette from the base game's
+**IWAD** (`doom2.wad` / `doom.wad`). Loaded on their own they render
+all-white, because the texture names resolve to nothing.
+
+Pass the base IWAD with `-iwad`. Sources are merged in load order — the IWAD
+first, then the content WAD on top — following DOOM's **last-wins** rule: a
+lump in the later file (the PWAD) overrides the same-named lump in the IWAD,
+and anything the PWAD does not provide (textures, flats, palette, even other
+maps) falls through to the IWAD. A PWAD level shadows the IWAD's level of the
+same name, so `-iwad doom2.wad mymegawad.wad MAP01` shows the PWAD's MAP01 with
+doom2's textures.
 
 ### Command Line Arguments
 
 - `-wad`: Use WAD format (default if no format specified)
 - `-json`: Use JSON format
 - `-dsl`: Use DSL format
+- `-iwad <file>`: Optional base IWAD loaded first for shared resources
+  (e.g. `doom2.wad` so a DOOM II PWAD renders with textures instead of white).
 - `content_file`: Path to the input file
 - `level_name`: Optional. Name of the level to display. If not specified, the first level in the file will be used.
 - `--mcp`: Optional. Start the in-engine MCP server (only effective if the
