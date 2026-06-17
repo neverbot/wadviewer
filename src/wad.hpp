@@ -8,24 +8,6 @@
 #include <vector>
 
 /**
- * enum with the possible formats for the file to be loaded or written.
- * - WAD: Standard WAD format
- * - JSON: JSON format
- * - JSON_VERBOSE: JSON format with verbose output
- * - DSL: Custom DSL format
- * - DSL_VERBOSE: Custom DSL format with verbose output
- * The format is used to determine how to read or write the file.
- * The default format is WAD.
- */
-enum class WADFormat : std::uint8_t {
-  WAD,
-  JSON,
-  JSON_VERBOSE,
-  DSL,
-  DSL_VERBOSE
-};
-
-/**
  * Class representing a WAD file. This class provides methods to read and
  * process WAD files, extract level data, and convert it to various formats. The
  * WAD format is used in classic games like DOOM. The class can read level
@@ -179,14 +161,9 @@ public:
     std::vector<FlatData>    flats;         // Floor/ceiling textures
   };
 
-  // Process and load all WAD data
+  // Parse the shared resources (palette, textures, patches) and index the level
+  // markers. Individual levels are parsed on demand by getLevel().
   void processWAD();
-
-  // Convert WAD data to JSON format
-  std::string toJSON() const;
-  std::string toJSONVerbose() const;
-  // Convert WAD data to custom DSL format
-  std::string toDSL() const;
 
   Level       getLevel(const std::string &) const;
   std::string getLevelNameByIndex(int index) const;
@@ -209,15 +186,27 @@ private:
   std::vector<std::vector<uint8_t>> sourceData_;
   std::vector<Directory>            directory_;
   std::vector<std::size_t>          lumpSource_;
-  std::vector<PatchData>            patches_;
 
-  // List of levels in the WAD file
-  std::vector<Level> levels_;
+  // Shared resources, parsed once from the merged archive in processWAD. Every
+  // level built on demand carries these (see buildLevel) rather than re-parsing
+  // them, so they are read and decoded a single time per WAD.
+  std::vector<Color>       palette_;
+  std::vector<TextureDef>  textureDefs_;  // TEXTURE1/TEXTURE2
+  std::vector<PatchData>   allPatches_;   // indexed by PNAMES index
+  std::vector<std::string> patchNames_;   // PNAMES
+
+  // Directory indices of the (non-shadowed) level markers, in file order. Used
+  // to enumerate levels and to locate a level for on-demand parsing.
+  std::vector<std::size_t> levelMarkers_;
 
   // Load one source file (header + directory) and append its lumps to the
   // merged archive. Sources are added in priority order (IWAD then PWAD).
   void        addSource(const std::string &filepath);
   static bool isLevelMarker(const std::string &name);
+
+  // Parse a single level (geometry + flats) on demand, given its marker's
+  // directory index, attaching the shared resources.
+  Level buildLevel(std::size_t markerIndex) const;
 
   // Find the FIRST lump named `name` at or after `startIndex`. Used to read a
   // map's sub-lumps (VERTEXES, LINEDEFS, ...) that immediately follow their

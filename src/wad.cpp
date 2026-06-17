@@ -6,10 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <set>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -649,357 +646,100 @@ void WAD::processWAD() {
               << requiredCount << " required patches\n";
   }
 
-  // Now process levels (using the loaded textures/patches)
+  // Store the shared resources once. Every level built on demand references
+  // these (see buildLevel) instead of re-parsing or duplicating them.
+  palette_.swap(palette);
+  textureDefs_.swap(allTextures);
+  allPatches_.swap(allPatches);
+  patchNames_.swap(patchNames);
+
+  // Record the (non-shadowed) level markers. Geometry is NOT parsed here --
+  // only getLevel() parses a level, on demand, so viewing one level no longer
+  // pays to parse all of them. When an IWAD and a PWAD both define a level, the
+  // later (PWAD) copy is the one kept.
   for (size_t i = 0; i < directory_.size(); i++) {
     std::string lumpName = trimString(directory_[i].name, 8);
-
-    if (isLevelMarker(lumpName)) {
-      // Skip a level marker that a later source overrides: when an IWAD and a
-      // PWAD both define MAP01, only the PWAD's (last) copy is enumerated.
-      if (hasLevelMarkerAfter(lumpName, i)) {
-        continue;
-      }
-
+    if (isLevelMarker(lumpName) && !hasLevelMarkerAfter(lumpName, i)) {
       std::cout << "WAD :: Found level " << lumpName << "\n";
-      Level level;
-      std::strncpy(level.name, lumpName.c_str(), 8);
-      level.texture_defs = allTextures;
-      level.patches      = allPatches;
-      level.patch_names  = patchNames;
-      level.palette      = palette;
-
-      // Load level data (VERTEXES, LINEDEFS, etc.). These sub-lumps follow the
-      // marker in the same source, so a forward first-match search is correct.
-      LumpLoc subLoc;
-      if (findLump("VERTEXES", subLoc, i + 1)) {
-        level.vertices = readVertices(subLoc);
-      }
-      if (findLump("LINEDEFS", subLoc, i + 1)) {
-        level.linedefs = readLinedefs(subLoc);
-      }
-      if (findLump("SIDEDEFS", subLoc, i + 1)) {
-        level.sidedefs = readSidedefs(subLoc);
-      }
-      if (findLump("SECTORS", subLoc, i + 1)) {
-        level.sectors = readSectors(subLoc);
-      }
-      if (findLump("THINGS", subLoc, i + 1)) {
-        level.things = readThings(subLoc);
-      }
-
-      // Load player start position (Thing type 1)
-      for (size_t j = 0; j < level.things.size(); j++) {
-        if (level.things[j].type == 1) {
-          level.has_player_start = true;
-          level.player_start     = level.things[j];
-          break;
-        }
-      }
-
-      // Load all unique flat textures referenced by sectors
-      std::set<std::string> uniqueFlats;
-      for (size_t j = 0; j < level.sectors.size(); j++) {
-        std::string floorTex = trimString(level.sectors[j].floor_texture, 8);
-        std::string ceilTex  = trimString(level.sectors[j].ceiling_texture, 8);
-
-        if (!floorTex.empty() && floorTex != "-") {
-          uniqueFlats.insert(floorTex);
-        }
-        if (!ceilTex.empty() && ceilTex != "-") {
-          uniqueFlats.insert(ceilTex);
-        }
-      }
-
-      // Load each unique flat texture (override-aware: a PWAD flat shadows the
-      // IWAD's; a resource-less PWAD resolves flats from the IWAD).
-      for (std::set<std::string>::iterator it = uniqueFlats.begin();
-           it != uniqueFlats.end(); ++it) {
-        LumpLoc flatLoc;
-        if (findLastLump(*it, flatLoc)) {
-          std::vector<uint8_t> flatData = readLump(flatLoc);
-          if (flatData.size() == 64 * 64) {  // DOOM flats are always 64x64
-            FlatData flat;
-            std::strncpy(flat.name, it->c_str(), 8);
-            flat.data = flatData;
-            level.flats.push_back(flat);
-          }
-        }
-      }
-
-      levels_.push_back(level);
+      levelMarkers_.push_back(i);
     }
   }
 }
 
 /**
- * @brief Convert WAD data to JSON verbose format
- * @return JSON string containing the WAD data
- * @note This function uses the nlohmann::json library to create a JSON
- * representation of the WAD data. The output is more verbose than the
- * compact version, with arrays formatted in a more human-readable way.
+ * @brief Parse a single level on demand
+ * @param markerIndex Directory index of the level's marker lump
+ * @return The fully parsed Level, carrying the shared resources
+ * @note Only the requested level is parsed; the viewer never needs the others.
  */
-std::string WAD::toJSONVerbose() const {
-  nlohmann::json j;
-  j["levels"] = nlohmann::json::array();
+WAD::Level WAD::buildLevel(size_t markerIndex) const {
+  Level       level;
+  std::string lumpName = trimString(directory_[markerIndex].name, 8);
+  std::strncpy(level.name, lumpName.c_str(), 8);
 
-  for (size_t levelIndex = 0; levelIndex < levels_.size(); levelIndex++) {
-    const Level   &level = levels_[levelIndex];
-    nlohmann::json levelJson;
-    levelJson["name"] = level.name;
+  // Attach the shared resources (parsed once in processWAD).
+  level.texture_defs = textureDefs_;
+  level.patches      = allPatches_;
+  level.patch_names  = patchNames_;
+  level.palette      = palette_;
 
-    levelJson["vertices"] = nlohmann::json::array();
-    for (size_t vertIndex = 0; vertIndex < level.vertices.size(); vertIndex++) {
-      const Vertex &v = level.vertices[vertIndex];
-      levelJson["vertices"].push_back({{"x", v.x}, {"y", v.y}});
-    }
-
-    levelJson["linedefs"] = nlohmann::json::array();
-    for (size_t lineIndex = 0; lineIndex < level.linedefs.size(); lineIndex++) {
-      const Linedef &l = level.linedefs[lineIndex];
-      levelJson["linedefs"].push_back({{"start", l.start_vertex},
-                                       {"end", l.end_vertex},
-                                       {"flags", l.flags},
-                                       {"type", l.line_type},
-                                       {"tag", l.sector_tag},
-                                       {"right_sidedef", l.right_sidedef},
-                                       {"left_sidedef", l.left_sidedef}});
-    }
-
-    levelJson["sidedefs"] = nlohmann::json::array();
-    for (size_t sideIndex = 0; sideIndex < level.sidedefs.size(); sideIndex++) {
-      const Sidedef &s = level.sidedefs[sideIndex];
-      levelJson["sidedefs"].push_back(
-          {{"x_offset", s.x_offset},
-           {"y_offset", s.y_offset},
-           {"upper_texture",
-            std::string(s.upper_texture, strnlen(s.upper_texture, 8))},
-           {"lower_texture",
-            std::string(s.lower_texture, strnlen(s.lower_texture, 8))},
-           {"middle_texture",
-            std::string(s.middle_texture, strnlen(s.middle_texture, 8))},
-           {"sector", s.sector}});
-    }
-
-    levelJson["sectors"] = nlohmann::json::array();
-    for (size_t sectIndex = 0; sectIndex < level.sectors.size(); sectIndex++) {
-      const Sector &s = level.sectors[sectIndex];
-      levelJson["sectors"].push_back(
-          {{"floor_height", s.floor_height},
-           {"ceiling_height", s.ceiling_height},
-           {"floor_texture",
-            std::string(s.floor_texture, strnlen(s.floor_texture, 8))},
-           {"ceiling_texture",
-            std::string(s.ceiling_texture, strnlen(s.ceiling_texture, 8))},
-           {"light_level", s.light_level},
-           {"type", s.type},
-           {"tag", s.tag}});
-    }
-
-    levelJson["things"] = nlohmann::json::array();
-    for (size_t thingIndex = 0; thingIndex < level.things.size();
-         thingIndex++) {
-      const Thing &t = level.things[thingIndex];
-      levelJson["things"].push_back({{"x", t.x},
-                                     {"y", t.y},
-                                     {"angle", t.angle},
-                                     {"type", t.type},
-                                     {"flags", t.flags}});
-    }
-
-    j["levels"].push_back(levelJson);
+  // Load level data (VERTEXES, LINEDEFS, ...). These sub-lumps follow the
+  // marker in the same source, so a forward first-match search is correct.
+  LumpLoc subLoc;
+  if (findLump("VERTEXES", subLoc, markerIndex + 1)) {
+    level.vertices = readVertices(subLoc);
+  }
+  if (findLump("LINEDEFS", subLoc, markerIndex + 1)) {
+    level.linedefs = readLinedefs(subLoc);
+  }
+  if (findLump("SIDEDEFS", subLoc, markerIndex + 1)) {
+    level.sidedefs = readSidedefs(subLoc);
+  }
+  if (findLump("SECTORS", subLoc, markerIndex + 1)) {
+    level.sectors = readSectors(subLoc);
+  }
+  if (findLump("THINGS", subLoc, markerIndex + 1)) {
+    level.things = readThings(subLoc);
   }
 
-  return j.dump(1);
-}
-
-/**
- * @brief Create arrays with compact formatting
- * @param array JSON array to format
- * @return Formatted JSON string
- * @note This function formats the JSON array without line breaks and
- *       indentation, making it more compact.
- */
-std::string formatArray(const nlohmann::json &array) {
-  std::string result = "[";
-  for (size_t i = 0; i < array.size(); ++i) {
-    result += array[i].dump();  // dump each object without any formatting
-    if (i < array.size() - 1) {
-      result += ",";
+  // Load player start position (Thing type 1)
+  for (size_t j = 0; j < level.things.size(); j++) {
+    if (level.things[j].type == 1) {
+      level.has_player_start = true;
+      level.player_start     = level.things[j];
+      break;
     }
   }
-  result += "]";
-  return result;
-}
 
-/**
- * @brief Convert WAD data to custom DSL format
- * @return DSL string containing the WAD data
- */
-std::string WAD::toDSL() const {
-  std::ostringstream out;
-
-  for (size_t levelIndex = 0; levelIndex < levels_.size(); levelIndex++) {
-    const Level &level = levels_[levelIndex];
-
-    out << "LEVEL " << level.name << " START\n\n";
-
-    // VERTICES
-    out << "VERTICES:\n";
-    for (size_t vertIndex = 0; vertIndex < level.vertices.size(); vertIndex++) {
-      const Vertex &v = level.vertices[vertIndex];
-      out << "(" << v.x << ", " << v.y << ")\n";
+  // Collect the unique flat textures referenced by sectors and load each
+  // (override-aware: a PWAD flat shadows the IWAD's; a resource-less PWAD
+  // resolves flats from the IWAD).
+  std::set<std::string> uniqueFlats;
+  for (size_t j = 0; j < level.sectors.size(); j++) {
+    std::string floorTex = trimString(level.sectors[j].floor_texture, 8);
+    std::string ceilTex  = trimString(level.sectors[j].ceiling_texture, 8);
+    if (!floorTex.empty() && floorTex != "-") {
+      uniqueFlats.insert(floorTex);
     }
-
-    // LINEDEFS
-    out << "\nLINEDEFS:\n";
-    for (size_t lineIndex = 0; lineIndex < level.linedefs.size(); lineIndex++) {
-      const Linedef &l = level.linedefs[lineIndex];
-      out << l.start_vertex << " -> " << l.end_vertex << " | flags: " << l.flags
-          << " | type: " << l.line_type << " | tag: " << l.sector_tag
-          << " | right: " << l.right_sidedef << " | left: " << l.left_sidedef
-          << "\n";
+    if (!ceilTex.empty() && ceilTex != "-") {
+      uniqueFlats.insert(ceilTex);
     }
-
-    // SECTORS
-    out << "\nSECTORS:\n";
-    for (size_t sectIndex = 0; sectIndex < level.sectors.size(); sectIndex++) {
-      const Sector &s = level.sectors[sectIndex];
-      out << "floor: " << s.floor_height << " | ceil: " << s.ceiling_height
-          << " | light: " << s.light_level << " | floor_tex: "
-          << std::string(s.floor_texture, strnlen(s.floor_texture, 8))
-          << " | ceil_tex: "
-          << std::string(s.ceiling_texture, strnlen(s.ceiling_texture, 8))
-          << "\n";
+  }
+  for (std::set<std::string>::iterator it = uniqueFlats.begin();
+       it != uniqueFlats.end(); ++it) {
+    LumpLoc flatLoc;
+    if (findLastLump(*it, flatLoc)) {
+      std::vector<uint8_t> flatData = readLump(flatLoc);
+      if (flatData.size() == 64 * 64) {  // DOOM flats are always 64x64
+        FlatData flat;
+        std::strncpy(flat.name, it->c_str(), 8);
+        flat.data = flatData;
+        level.flats.push_back(flat);
+      }
     }
-
-    // THINGS
-    out << "\nTHINGS:\n";
-    for (size_t thingIndex = 0; thingIndex < level.things.size();
-         thingIndex++) {
-      const Thing &t       = level.things[thingIndex];
-      std::string  typeStr = (t.type == 1) ? "PlayerStart" : "Thing";
-      out << typeStr << " at (" << t.x << ", " << t.y << ")"
-          << " | angle: " << t.angle << " | type: " << t.type << "\n";
-    }
-
-    out << "\nLEVEL " << level.name << " END\n\n";
   }
 
-  return out.str();
-}
-
-/**
- * @brief Convert WAD data to JSON brief format
- * @return JSON string containing the WAD data
- * @note This function uses the nlohmann::json library to create a JSON
- * representation of the WAD data. The output is more compact than the
- * verbose version, with arrays formatted in a single line.
- */
-std::string WAD::toJSON() const {
-  std::ostringstream out;
-  out << "{\n";
-
-  // lambda helper to print arrays with one object per line
-  auto dumpArray = [&](const std::string &key, const nlohmann::json &array) {
-    out << "   \"" << key << "\": [\n";
-    for (size_t i = 0; i < array.size(); ++i) {
-      out << "    " << array[i].dump(-1);
-      if (i < array.size() - 1)
-        out << ",";
-      out << "\n";
-    }
-    out << "   ]";
-  };
-
-  out << " \"levels\": [\n";
-  for (size_t levelIndex = 0; levelIndex < levels_.size(); levelIndex++) {
-    const Level &level = levels_[levelIndex];
-    // nlohmann::json levelJson;
-    // levelJson["name"] = level.name;
-    out << "  {\n" << "   \"name\": \"" << level.name << "\",\n";
-
-    // v (vertices)
-    nlohmann::json jv = nlohmann::json::array();
-    for (size_t vertIndex = 0; vertIndex < level.vertices.size(); vertIndex++) {
-      const Vertex &v = level.vertices[vertIndex];
-      jv.push_back({{"x", v.x}, {"y", v.y}});
-    }
-    // levelJson["v"] = jv;
-    dumpArray("v", jv);
-    out << ",\n";
-
-    // l (linedefs)
-    nlohmann::json jl = nlohmann::json::array();
-    for (size_t lineIndex = 0; lineIndex < level.linedefs.size(); lineIndex++) {
-      const Linedef &l = level.linedefs[lineIndex];
-      jl.push_back({{"s", l.start_vertex},
-                    {"e", l.end_vertex},
-                    {"f", l.flags},
-                    {"t", l.line_type},
-                    {"g", l.sector_tag},
-                    {"r", l.right_sidedef},
-                    {"l", l.left_sidedef}});
-    }
-    // levelJson["l"] = jl;
-    dumpArray("l", jl);
-    out << ",\n";
-
-    // si (sidedefs)
-    nlohmann::json jsi = nlohmann::json::array();
-    for (size_t sideIndex = 0; sideIndex < level.sidedefs.size(); sideIndex++) {
-      const Sidedef &s = level.sidedefs[sideIndex];
-      jsi.push_back({{"x", s.x_offset},
-                     {"y", s.y_offset},
-                     {"u", trimString(s.upper_texture, 8)},
-                     {"l", trimString(s.lower_texture, 8)},
-                     {"m", trimString(s.middle_texture, 8)},
-                     {"s", s.sector}});
-    }
-    // levelJson["si"] = jsi;
-    dumpArray("si", jsi);
-    out << ",\n";
-
-    // se (sectors)
-    nlohmann::json jse = nlohmann::json::array();
-    for (size_t sectIndex = 0; sectIndex < level.sectors.size(); sectIndex++) {
-      const Sector &s = level.sectors[sectIndex];
-      jse.push_back({{"f", s.floor_height},
-                     {"c", s.ceiling_height},
-                     {"t", trimString(s.floor_texture, 8)},
-                     {"x", trimString(s.ceiling_texture, 8)},
-                     {"l", s.light_level},
-                     {"y", s.type},
-                     {"g", s.tag}});
-    }
-    // levelJson["se"] = jse;
-    dumpArray("se", jse);
-    out << ",\n";
-
-    // t (things)
-    nlohmann::json jt = nlohmann::json::array();
-    for (size_t thingIndex = 0; thingIndex < level.things.size();
-         thingIndex++) {
-      const Thing &t = level.things[thingIndex];
-      jt.push_back({{"x", t.x},
-                    {"y", t.y},
-                    {"a", t.angle},
-                    {"t", t.type},
-                    {"f", t.flags}});
-    }
-    // levelJson["t"] = jt;
-    dumpArray("t", jt);
-    out << "\n  }";
-
-    // out << "  " << levelJson.dump(2);
-    if (levelIndex < levels_.size() - 1) {
-      out << ",";
-    }
-    out << "\n";
-  }
-  out << " ]\n";
-  out << "}\n";
-
-  return out.str();
+  return level;
 }
 
 /**
@@ -1011,11 +751,12 @@ std::string WAD::toJSON() const {
 WAD::Level WAD::getLevel(const std::string &name) const {
   std::cout << "WAD :: Looking for level: '" << name << "'...";
 
-  // Compare the first 8 characters of the name
-  for (size_t i = 0; i < levels_.size(); i++) {
-    if (strncmp(levels_[i].name, name.c_str(), 8) == 0) {
+  // Find the matching (non-shadowed) marker and parse just that level.
+  std::string target = trimString(name, 8);
+  for (size_t i = 0; i < levelMarkers_.size(); i++) {
+    if (trimString(directory_[levelMarkers_[i]].name, 8) == target) {
       std::cout << " found!\n";
-      return levels_[i];
+      return buildLevel(levelMarkers_[i]);
     }
   }
 
@@ -1029,8 +770,8 @@ WAD::Level WAD::getLevel(const std::string &name) const {
  * @throws std::out_of_range if the index is out of range
  */
 std::string WAD::getLevelNameByIndex(int index) const {
-  if (index < levels_.size()) {
-    return std::string(levels_[index].name, strnlen(levels_[index].name, 8));
+  if (index >= 0 && static_cast<size_t>(index) < levelMarkers_.size()) {
+    return trimString(directory_[levelMarkers_[index]].name, 8);
   }
 
   throw std::out_of_range("Index out of range");

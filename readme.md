@@ -9,7 +9,7 @@ A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://g
 ## Features
 
 - Load and view WAD file geometry.
-- Multiple input formats supported (WAD, JSON, DSL).
+- Load a base IWAD + PWAD together so PWAD maps render with the IWAD's textures.
 - Interactive 3D camera controls.
 - Texture display support.
 
@@ -64,13 +64,8 @@ Run through xmake (it runs from the project root, where the `wads/`
 folder lives):
 
 ```bash
-# Using default WAD format
+# Load a WAD (the -wad selector is optional; WAD is the only format)
 xmake run wadviewer <content_file> [<level_name>]
-
-# Specifying format explicitly
-xmake run wadviewer -wad <content_file> [<level_name>]
-xmake run wadviewer -json <content_file> [<level_name>]
-xmake run wadviewer -dsl <content_file> [<level_name>]
 
 # With a base IWAD for shared resources (textures/flats/palette)
 xmake run wadviewer -iwad <iwad_file> <content_file> [<level_name>]
@@ -101,9 +96,7 @@ doom2's textures.
 
 ### Command Line Arguments
 
-- `-wad`: Use WAD format (default if no format specified)
-- `-json`: Use JSON format
-- `-dsl`: Use DSL format
+- `-wad`: WAD-format selector (the default and only format; optional)
 - `-iwad <file>`: Optional base IWAD loaded first for shared resources
   (e.g. `doom2.wad` so a DOOM II PWAD renders with textures instead of white).
 - `content_file`: Path to the input file
@@ -203,6 +196,6 @@ automatically; the engine is built from source via a git submodule:
 - [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (built from source, git submodule).
 - [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
 - [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
-- [nlohmann_json](https://github.com/nlohmann/json): JSON parsing.
+- [mapbox/earcut](https://github.com/mapbox/earcut.hpp): Header-only polygon-with-holes triangulation (sector floors/ceilings).
 - [OpenGL](https://www.opengl.org/): 3D graphics.
 - [GLFW](https://github.com/glfw/glfw): OpenGL context and window management.

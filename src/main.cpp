@@ -369,10 +369,10 @@ int main(int argc, char *argv[]) {
 
     // clang-format off
     if (argc < 2 || argc > 11) {
-      std::cout << "Usage: wadviewer [-format] [-iwad <iwad_file>] <content_file> [<level_name>] [--verbose] [--mcp] [--no-input]\n";
-      std::cout << "  -format     : Optional format of input file (-wad, -json, -dsl). Default: wad\n";
+      std::cout << "Usage: wadviewer [-wad] [-iwad <iwad_file>] <content_file> [<level_name>] [--verbose] [--mcp] [--no-input]\n";
+      std::cout << "  -wad        : Optional WAD-format selector (the default and only format)\n";
       std::cout << "  -iwad <file>: Optional base IWAD loaded first for shared resources (e.g. doom2.wad for DOOM II PWADs)\n";
-      std::cout << "  content_file: Path to the input file (WAD/JSON/DSL format)\n";
+      std::cout << "  content_file: Path to the WAD file\n";
       std::cout << "  level_name  : Optional. Name of the level to display. Default: first level in the file\n";
       std::cout << "  --verbose   : Optional. Enable verbose debug output\n";
       std::cout << "  --mcp       : Optional. Start the MCP server (http://127.0.0.1:8765/mcp) for agent control\n";
@@ -381,7 +381,6 @@ int main(int argc, char *argv[]) {
     }
     // clang-format on
 
-    // WADFormat   format = WADFormat::WAD;  // Default format
     std::string contentFile;
     std::string iwadFile   = "";     // Optional base IWAD (resources)
     std::string levelName  = "";     // Empty string means use first level
@@ -390,10 +389,9 @@ int main(int argc, char *argv[]) {
     bool        noInput    = false;  // Ignore physical input (MCP-only)
 
     // Single pass over the arguments: collect flags, the optional base IWAD
-    // (-iwad <path>) and the positional content file / level name. Format
-    // selectors (-wad/-json/-dsl) are accepted but currently ignored (only WAD
-    // is wired). Anything not recognised as a flag is positional: the first
-    // positional is the content file, the second the level name.
+    // (-iwad <path>) and the positional content file / level name. Anything not
+    // recognised as a flag is positional: the first positional is the content
+    // file, the second the level name.
     std::vector<std::string> positionals;
     for (int i = 1; i < argc; i++) {
       std::string arg = argv[i];
@@ -410,8 +408,8 @@ int main(int argc, char *argv[]) {
           std::cerr << "-iwad requires a path argument\n";
           return 1;
         }
-      } else if (arg == "-wad" || arg == "-json" || arg == "-dsl") {
-        // Format selector (only WAD is active today); ignored.
+      } else if (arg == "-wad") {
+        // WAD-format selector (the only format); accepted as a no-op.
       } else {
         positionals.push_back(arg);
       }
