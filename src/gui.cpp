@@ -24,8 +24,10 @@ GUI::GUI(OkCamera *camera) {
 
   // Create texture preview element structure (without OpenGL objects yet)
   GUIElement texturePreviewElement;
-  texturePreviewElement.type        = "texture_preview";
-  texturePreviewElement.visible     = true;
+  texturePreviewElement.type = "texture_preview";
+  // The texture-preview panel starts HIDDEN; the T key toggles it on. Keeping
+  // it off by default leaves the view clean for inspecting geometry.
+  texturePreviewElement.visible     = false;
   texturePreviewElement.item        = nullptr;
   texturePreviewElement.initialized = false;
   guiElements.push_back(texturePreviewElement);
@@ -91,6 +93,8 @@ void GUI::initializeGUIElements() {
   if (!guiElements.empty() && !guiElements[0].initialized) {
     createTexturePreview(0);
     guiElements[0].initialized = true;
+    // Honour the element's initial visibility (hidden by default; T toggles it).
+    guiElements[0].item->setVisible(guiElements[0].visible);
 
     // Apply first texture
     if (!textureNames.empty()) {

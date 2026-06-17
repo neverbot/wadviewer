@@ -122,11 +122,11 @@ doom2's textures.
 ╠══════════════════════════════════════════════════════════════╣
 ║  TEXTURE VIEWER:                                             ║
 ║    SPACE BAR  - Cycle through textures                       ║
-║    T          - Toggle texture viewer visibility             ║
+║    T          - Toggle texture viewer (hidden by default)    ║
 ║                                                              ║
 ║  DEBUG / INSPECT:                                           ║
 ║    F          - Toggle debug gizmos (origin axes, camera     ║
-║                 boxes, wireframe cubes)                      ║
+║                 boxes, wireframe cubes) (hidden by default)  ║
 ║    R          - Toggle ceiling/floor visibility              ║
 ║                                                              ║
 ║  CAMERAS:                                                    ║

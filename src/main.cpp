@@ -481,12 +481,14 @@ int main(int argc, char *argv[]) {
                            ", Ceilings: " + std::to_string(ceilingCount));
 
         group->setDrawOriginAxisForAll(false);
-        group->setDrawOriginAxis(true);
+        group->setDrawOriginAxis(false);
       }
 
-      // Debug gizmos (origin axes + wireframe cubes) start visible; the F key
-      // toggles them all off/on (see stepCallback).
-      OkConfig::setBool("viewer.debug-gizmos-visible", true);
+      // Debug gizmos (origin axes + wireframe cubes) start HIDDEN; the F key
+      // toggles them all on/off (see stepCallback). Starting clean keeps the
+      // default view uncluttered for inspecting geometry.
+      OkConfig::setBool("viewer.debug-gizmos-visible", false);
+      OkConfig::setBool("graphics.drawCameras", false);
 
       // Position camera to view the entire level
       positionCameraForLevel(camera, sectorGroups);
@@ -546,14 +548,16 @@ int main(int argc, char *argv[]) {
           new OkItem("cube", vertices.data(), static_cast<int>(vertices.size()),
                      indices.data(), static_cast<int>(indices.size()));
       item->setWireframe(true);
-      item->setDrawOriginAxis(true);
+      item->setDrawOriginAxis(false);
+      item->setVisible(false);  // Debug gizmo: hidden until toggled with F.
 
       item2 = new OkItem("cube2", vertices.data(),
                          static_cast<int>(vertices.size()), indices.data(),
                          static_cast<int>(indices.size()));
       item2->setWireframe(true);
       item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
-      item2->setDrawOriginAxis(true);
+      item2->setDrawOriginAxis(false);
+      item2->setVisible(false);  // Debug gizmo: hidden until toggled with F.
 
       scene->addObject(item);
       item2->attachTo(item);
