@@ -490,6 +490,13 @@ bridgeHoleIntoOuter(const WAD::Level &level, const std::vector<int> &outer,
         continue;
       }
       double dist = (ox - hx) * (ox - hx) + (oy - hy) * (oy - hy);
+      // A zero-length bridge means the hole shares this vertex with the outer
+      // (the hole touches the boundary at a pinch point). Splicing through it
+      // gives a degenerate channel ear-clipping cannot resolve; require a real
+      // (non-coincident) channel to a different outer vertex, as earcut does.
+      if (dist == 0.0) {
+        continue;
+      }
       if (bestDist < 0.0 || dist < bestDist) {
         bestDist = dist;
         bestH    = h;
@@ -600,7 +607,40 @@ void earClip(const WAD::Level &level, const std::vector<int> &ring,
       break;
     }
     if (!earFound) {
-      break;  // Cannot make further progress (degenerate geometry).
+      // No proper convex ear this sweep. The ring may still carry degenerate
+      // artifacts from hole-bridging -- zero-length edges (a vertex coincident
+      // with a neighbour) and spikes (prev and next at the SAME point, so the
+      // middle vertex is a dead-end stub). These have zero area and cross == 0,
+      // so they are never clipped as ears and stall the whole triangulation.
+      // Strip ONE such degenerate vertex (no triangle emitted -- it covers no
+      // area) and resume; this is exact, since removing a collinear/coincident
+      // vertex leaves the covered region unchanged. Only give up if the ring
+      // has no removable degeneracy left.
+      int  m       = static_cast<int>(poly.size());
+      bool removed = false;
+      for (int i = 0; i < m; i++) {
+        int    pa = poly[(i + m - 1) % m];
+        int    pb = poly[i];
+        int    pc = poly[(i + 1) % m];
+        double ax = static_cast<double>(level.vertices[ring[pa]].x);
+        double ay = static_cast<double>(level.vertices[ring[pa]].y);
+        double bx = static_cast<double>(level.vertices[ring[pb]].x);
+        double by = static_cast<double>(level.vertices[ring[pb]].y);
+        double cx = static_cast<double>(level.vertices[ring[pc]].x);
+        double cy = static_cast<double>(level.vertices[ring[pc]].y);
+        bool coincidentPrev = (bx == ax && by == ay);
+        bool coincidentNext = (bx == cx && by == cy);
+        bool spike          = (ax == cx && ay == cy);
+        if (coincidentPrev || coincidentNext || spike) {
+          poly.erase(poly.begin() + i);
+          guard   = 4 * static_cast<int>(poly.size());
+          removed = true;
+          break;
+        }
+      }
+      if (!removed) {
+        break;  // Genuinely stuck (non-degenerate self-intersection).
+      }
     }
   }
 }
