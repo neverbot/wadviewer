@@ -23,9 +23,12 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".", lsp = "clangd"
 add_rules("mode.debug", "mode.release")
 set_defaultmode("debug")
 
--- wadviewer's own third-party dependency. glm / glfw / stb / opengl come
+-- wadviewer's own third-party dependencies. glm / glfw / stb / opengl come
 -- transitively from the engine (it exposes them as public packages).
 add_requires("nlohmann_json")
+-- Robust polygon-with-holes triangulation for sector floors/ceilings
+-- (header-only; used by wad-generate).
+add_requires("mapbox_earcut")
 
 -- Build the okinawa engine from source. It is vendored as a git submodule
 -- at ./okinawa.cpp (run `git submodule update --init` after cloning), so the
@@ -39,7 +42,7 @@ target("wadviewer")
     set_kind("binary")
     add_files("src/*.cpp")
     add_deps("okinawa")
-    add_packages("nlohmann_json")
+    add_packages("nlohmann_json", "mapbox_earcut")
 
     -- Run from the project root: the app resolves wads/ by relative path and
     -- the engine discovers its assets by walking up from the working dir to
