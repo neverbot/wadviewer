@@ -1,4 +1,4 @@
-# clangd configuration for okinawa.cpp standalone project
+# clangd configuration for okinawa standalone project
 CompileFlags:
   CompilationDatabase: build
   Add:

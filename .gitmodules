@@ -1,3 +1,3 @@
-[submodule "okinawa.cpp"]
-	path = okinawa.cpp
-	url = https://github.com/okinawa-dev/okinawa.cpp.git
+[submodule "okinawa"]
+	path = okinawa
+	url = https://github.com/okinawa-dev/okinawa.git

@@ -30,9 +30,9 @@ set_defaultmode("debug")
 add_requires("mapbox_earcut")
 
 -- Build the okinawa engine from source. It is vendored as a git submodule
--- at ./okinawa.cpp (run `git submodule update --init` after cloning), so the
+-- at ./okinawa (run `git submodule update --init` after cloning), so the
 -- build does not depend on the local directory layout.
-includes("okinawa.cpp")
+includes("okinawa")
 
 -- =========================================================================
 -- Viewer executable
@@ -45,7 +45,7 @@ target("wadviewer")
 
     -- Run from the project root: the app resolves wads/ by relative path and
     -- the engine discovers its assets by walking up from the working dir to
-    -- ../okinawa.cpp/assets.
+    -- ../okinawa/assets.
     set_rundir("$(projectdir)")
 
     -- macOS windowing/runtime frameworks (the engine links them privately;

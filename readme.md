@@ -1,6 +1,6 @@
 # WAD Viewer
 
-A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://github.com/okinawa-dev/okinawa.cpp). This tool allows you to view WAD ([Where's All the Data](https://doomwiki.org/wiki/WAD)) files, commonly used in games like DOOM, displaying their 3D geometry and textures.
+A WAD file viewer built with C++ and OpenGL using the [Okinawa engine](https://github.com/okinawa-dev/okinawa). This tool allows you to view WAD ([Where's All the Data](https://doomwiki.org/wiki/WAD)) files, commonly used in games like DOOM, displaying their 3D geometry and textures.
 
 <p align="center">
   <img width="500" alt="screenshot" src="/assets/project/screenshot.png">
@@ -26,8 +26,8 @@ is no separate dependency-installation step.
 
 ### Prerequisites
 
-The viewer is built against the [Okinawa engine](https://github.com/okinawa-dev/okinawa.cpp),
-which is vendored as a **git submodule** at `./okinawa.cpp` and built from
+The viewer is built against the [Okinawa engine](https://github.com/okinawa-dev/okinawa),
+which is vendored as a **git submodule** at `./okinawa` and built from
 source. Clone the repository recursively so the engine comes with it:
 
 ```bash
@@ -42,7 +42,7 @@ git submodule update --init
 
 xmake builds the engine from the submodule automatically; there is no
 binary package step. To work on the engine, edit it inside the
-`okinawa.cpp/` submodule and rebuild wadviewer — the changes are picked
+`okinawa/` submodule and rebuild wadviewer — the changes are picked
 up directly.
 
 ### Build
@@ -193,7 +193,7 @@ its readme.)
 Third-party dependencies are managed by xmake (xrepo) and fetched
 automatically; the engine is built from source via a git submodule:
 
-- [okinawa](https://github.com/okinawa-dev/okinawa.cpp): 3D game engine providing core functionality (built from source, git submodule).
+- [okinawa](https://github.com/okinawa-dev/okinawa): 3D game engine providing core functionality (built from source, git submodule).
 - [GLM](https://github.com/g-truc/glm): OpenGL Mathematics library.
 - [STB](https://github.com/nothings/stb): Single file libraries (Image loading).
 - [mapbox/earcut](https://github.com/mapbox/earcut.hpp): Header-only polygon-with-holes triangulation (sector floors/ceilings).
