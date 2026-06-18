@@ -25,9 +25,7 @@
 #include "./wad-converter.hpp"
 #include "./wad.hpp"
 
-OkItem *item  = nullptr;
-OkItem *item2 = nullptr;
-GUI    *gui   = nullptr;
+GUI *gui = nullptr;
 
 // Global level groups for sector-based organization
 std::vector<OkItemGroup *> sectorGroups;
@@ -82,8 +80,8 @@ void stepCallback(float deltaTime) {
   }
   lastAction1State = state.action3;
 
-  // Toggle all debug gizmos (origin axes + the wireframe debug cubes) with F.
-  // The texture-preview square has its own toggle (T) handled by the GUI.
+  // Toggle the debug gizmos (sector origin axes + inactive-camera boxes) with
+  // F. The texture-preview panel has its own toggle (T) handled by the GUI.
   if (state.action4) {
     bool debugVisible = !OkConfig::getBool("viewer.debug-gizmos-visible");
     OkConfig::setBool("viewer.debug-gizmos-visible", debugVisible);
@@ -93,14 +91,6 @@ void stepCallback(float deltaTime) {
 
     for (size_t i = 0; i < sectorGroups.size(); i++) {
       sectorGroups[i]->setDrawOriginAxis(debugVisible);
-    }
-    if (item) {
-      item->setVisible(debugVisible);
-      item->setDrawOriginAxis(debugVisible);
-    }
-    if (item2) {
-      item2->setVisible(debugVisible);
-      item2->setDrawOriginAxis(debugVisible);
     }
 
     OkLogger::info("UI", "Debug gizmos toggled: " +
@@ -144,16 +134,6 @@ void stepCallback(float deltaTime) {
   // Set the camera's speed - this will be applied in OkObject::step
   camera->setSpeed(direction.x(), direction.y(), direction.z());
 
-  // Rotate item2 on the XY plane
-  // if (item2) {
-  //   // Rotate 10 degree per second
-  //   item2->rotate(0.0f, 0.0f, glm::radians(0.1f * deltaTime));
-  // }
-  if (item) {
-    // Rotate 10 degree per second
-    item->rotate(0.0f, glm::radians(0.1f * deltaTime), 0.0f);
-  }
-
   // Log only once per second for debugging
   static int frameCount = 0;
   if (frameCount++ % 60 == 0) {  // Assuming 60 FPS, adjust if different
@@ -168,40 +148,6 @@ void stepCallback(float deltaTime) {
  */
 void drawCallback(float deltaTime) {
   // Do whatever is needed, probably nothing here
-}
-
-/**
- * @brief Position the camera to view an item.
- * @param camera The camera to position.
- * @param item   The item to look at.
- */
-void positionCameraForItem(OkCamera *camera, const OkItem *item) {
-  float radius   = item->getRadius();
-  float distance = radius * 2.0f;
-  float height   = distance * 0.5f;
-
-  // Position camera above and behind the origin (item center)
-  OkPoint cameraPos(0.0f, height, distance);
-  camera->setPosition(cameraPos);
-
-  OkPoint targetPos(0.0f, 0.0f, 0.0f);  // Looking at origin
-  OkPoint direction = targetPos - cameraPos;
-
-  float pitch, yaw;
-  OkMath::directionVectorToAngles(direction.normalize(), pitch, yaw);
-  camera->setRotation(pitch, yaw, 0.0f);
-
-  // Adjust perspective for item size
-  float fov       = 45.0f;
-  float nearPlane = 0.1f;
-  float farPlane  = item->getRadius() * 5.0f;
-
-  camera->setPerspective(fov, nearPlane, farPlane);
-
-  OkLogger::info("Camera", "positioned at: " + cameraPos.toString());
-  OkLogger::info("Camera",
-                 "looking at pitch: " + std::to_string(glm::degrees(pitch)) +
-                     " yaw: " + std::to_string(glm::degrees(yaw)));
 }
 
 /**
@@ -340,7 +286,7 @@ int main(int argc, char *argv[]) {
     const float cameraSpeed = 10.0f;  // Units per second
     camera->setMaxVelocity(cameraSpeed);
 
-    // Not needed, will be set in positionCameraForItem
+    // Not needed, set later in positionCameraForLevel
     // camera->setPosition(position);
     // camera->setRotation(rotation);
     // camera->setPerspective(45.0f, 0.1f, 2000.0f);  // Increased far plane
@@ -482,9 +428,9 @@ int main(int argc, char *argv[]) {
         group->setDrawOriginAxis(false);
       }
 
-      // Debug gizmos (origin axes + wireframe cubes) start HIDDEN; the F key
-      // toggles them all on/off (see stepCallback). Starting clean keeps the
-      // default view uncluttered for inspecting geometry.
+      // Debug gizmos (origin axes + inactive-camera boxes) start HIDDEN; the F
+      // key toggles them all on/off (see stepCallback). Starting clean keeps
+      // the default view uncluttered for inspecting geometry.
       OkConfig::setBool("viewer.debug-gizmos-visible", false);
       OkConfig::setBool("graphics.drawCameras", false);
 
@@ -524,46 +470,6 @@ int main(int argc, char *argv[]) {
 
       // Initialize GUI
       gui = new GUI(camera);
-
-      // ************************************************************************
-
-      // ************************************************************************
-      // Create test items
-      std::vector<float> vertices = {
-          // Positions         // Texture coords
-          0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // top right
-          0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
-          -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,  // bottom left
-          -0.5f, 0.5f,  0.0f, 0.0f, 1.0f   // top left
-      };
-
-      std::vector<unsigned int> indices = {
-          0, 1, 3,  // first Triangle
-          1, 2, 3   // second Triangle
-      };
-
-      item =
-          new OkItem("cube", vertices.data(), static_cast<int>(vertices.size()),
-                     indices.data(), static_cast<int>(indices.size()));
-      item->setWireframe(true);
-      item->setDrawOriginAxis(false);
-      item->setVisible(false);  // Debug gizmo: hidden until toggled with F.
-
-      item2 = new OkItem("cube2", vertices.data(),
-                         static_cast<int>(vertices.size()), indices.data(),
-                         static_cast<int>(indices.size()));
-      item2->setWireframe(true);
-      item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
-      item2->setDrawOriginAxis(false);
-      item2->setVisible(false);  // Debug gizmo: hidden until toggled with F.
-
-      scene->addObject(item);
-      item2->attachTo(item);
-      // scene->addItem(item2);
-      item->setPosition(-2.0f, 0.0f, -10.0f);  // Left square
-      item2->setPosition(2.0f, 0.0f,
-                         0.0f);  // Right square (will be relative to item)
-      // ************************************************************************
 
     } catch (const std::exception &e) {
       std::cerr << "Error: " << e.what() << "\n";

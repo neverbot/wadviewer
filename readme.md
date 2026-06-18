@@ -119,7 +119,7 @@ doom2's textures.
 ║                                                              ║
 ║  DEBUG / INSPECT:                                            ║
 ║    F          - Toggle debug gizmos (origin axes, camera     ║
-║                 boxes, wireframe cubes) (hidden by default)  ║
+║                 boxes) (hidden by default)                   ║
 ║    R          - Toggle ceiling/floor visibility              ║
 ║                                                              ║
 ║  CAMERAS:                                                    ║
