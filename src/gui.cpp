@@ -9,6 +9,18 @@
 #include <string>
 #include <vector>
 
+namespace {
+// Texture-preview placement, in the preview camera's local space (the quad is
+// parented to the camera at kPreviewDepth). Its bottom-right corner is anchored
+// near the bottom-right of the view; positionTexturePreview keeps that corner
+// fixed as the quad resizes, so wide textures grow up-and-left instead of
+// running off the edge. The offsets are tuned for the viewer's ~74 deg FOV so
+// the panel sits just inside the frame.
+const float kPreviewDepth   = -30.0f;
+const float kPreviewCornerX = 29.0f;   // right-edge anchor (camera space)
+const float kPreviewCornerY = -21.0f;  // bottom-edge anchor (camera space)
+}  // namespace
+
 GUI::GUI(OkCamera *camera) {
   // Initialize member variables
   this->camera        = camera;
@@ -134,10 +146,19 @@ OkItem *GUI::createPolygonWithSize(const std::string &name, float width,
       new OkItem(name, vertices.data(), static_cast<int>(vertices.size()),
                  indices.data(), static_cast<int>(indices.size()));
 
-  // 2Attach to camera after object is fully constructed
+  // Parent it to the camera so the preview stays fixed on screen as the camera
+  // moves.
   item->attachTo(camera);
 
   return item;
+}
+
+// Anchor the preview quad's bottom-right corner near the bottom-right of the
+// view, independent of the quad's current size (so it never runs off the edge).
+void GUI::positionTexturePreview(OkItem *item, float halfWidth,
+                                 float halfHeight) {
+  item->setPosition(kPreviewCornerX - halfWidth, kPreviewCornerY + halfHeight,
+                    kPreviewDepth);
 }
 
 // Helper method to create the texture preview element
@@ -151,8 +172,9 @@ void GUI::createTexturePreview(int elementIndex) {
   guiElements[elementIndex].item =
       createPolygonWithSize("texture_preview", initialSize, initialSize);
 
-  // Position in front of the camera
-  guiElements[elementIndex].item->setPosition(10.0f, -7.0f, -30.0f);
+  // Anchor it at the bottom-right corner (re-anchored on each resize below).
+  positionTexturePreview(guiElements[elementIndex].item, initialSize / 2.0f,
+                         initialSize / 2.0f);
 }
 
 // Helper method to update texture preview size based on texture dimensions
@@ -195,4 +217,7 @@ void GUI::updateTexturePreviewSize(int elementIndex) {
   // Update the vertex data safely without recreating the item
   guiElements[elementIndex].item->updateVertexData(
       newVertices.data(), static_cast<long>(newVertices.size()));
+
+  // Keep the quad anchored at the bottom-right corner as it resizes.
+  positionTexturePreview(guiElements[elementIndex].item, halfWidth, halfHeight);
 }

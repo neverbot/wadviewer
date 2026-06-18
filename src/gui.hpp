@@ -27,6 +27,7 @@ private:
   void    initializeGUIElements();
   void    createTexturePreview(int elementIndex);
   void    updateTexturePreviewSize(int elementIndex);
+  void    positionTexturePreview(OkItem *item, float halfWidth, float halfHeight);
   OkItem *createPolygonWithSize(const std::string &name, float width,
                                 float height);
 
